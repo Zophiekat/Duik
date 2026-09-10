@@ -32,6 +32,54 @@ Just select the layer to constrain to, and set or animate its weight. To constra
 !!! note
     Because this constraint depends on the specific location of the layers at the beginning of the composition, you won't see the effect of the position constraint until there's an actual animation (using keyframes or expressions) on the master layers, and at the very first frame of the composition.
 
+## ![](../../img/duik/icons/move.svg){style="width:1em;"} Copy Location
+
+This is an After Effects version of [Blender's *Copy Location* constraint](https://docs.blender.org/manual/en/latest/animation/constraints/transform/copy_location.html). Where the position constraint above *adds* the movement of the master layers to the layer's own position, the copy location constraint *replaces* the location of the layer with the location of its target, one axis at a time.
+
+Select the layers to constrain and click ![](../../img/duik/icons/move.svg){style="width:1em;"} ***Copy Location***, then set its target in the ***Constraint settings***. The effect is named `Copy Location`, and `Copy Location.001`, `Copy Location.002`... for the next ones on the same layer.
+
+- **Target**: picked in the Duik panel, not in the effect — see [choosing the target](#choosing-the-target). It can be a layer of any composition of the project.
+- **Transform units**: how the coordinates of the target composition are read into this one.
+    - ***Pixels*** uses them as they are, one pixel for one pixel.
+    - ***Percentage*** reads the target's position as a share of its own composition and applies it to this one, so the centre of a `960 x 540` comp lands on the centre of a `1920 x 1080` one. Resolution stops mattering.
+    - ***Custom ratio*** multiplies the coordinates by the **Custom ratio** value — set it to `4` for one pixel in the target composition to become four here.
+- **Axis**: check **X**, **Y** and **Z** to choose which axis are copied; the others keep the value of the layer. **Invert X**, **Invert Y** and **Invert Z** negate the copied coordinate, mirroring the target around the origin of the space.
+- **Offset**: when checked, the location of the layer is added to the copied location instead of being replaced by it. This is what keeps the relative placement of a layer while it follows its target.
+- **Target space** and **Owner space**: the space the location of the target is read in, and the space it is written to.
+    - ***World Space*** is the composition, with every parent transformation applied.
+    - ***Custom Space*** is relative to the layer set in **Custom space**, so a layer can be constrained inside the coordinates of any other layer.
+    - ***Local Space*** is relative to the parent of the layer (of the target for the target space, of the constrained layer for the owner space). A layer without a parent is already in world space.
+- **Influence**: blends between the original location of the layer and the constrained one, in world space. At `0 %` the constraint does nothing, at `100 %` it fully applies.
+
+You can duplicate the effect to stack several copy location constraints on the same layer: they're evaluated from top to bottom, each one starting from the result of the previous one, exactly like the constraint stack of Blender.
+
+!!! note
+    The constraint is computed live by an expression: it doesn't need any keyframe, neither on the layer nor on its target, and updates as soon as anything moves.
+
+!!! tip
+    Axis are the axis of After Effects, not of Blender: **Y** goes *down* the composition and **Z** goes *away* from the camera. On a 2D layer, the **Z** options are simply ignored.
+
+### Choosing the target
+
+The target is set in the ***Constraint settings***, opened with the gear button in the toolbar at the top of the panel. Select the constrained layers, pick a **Target Composition** and a **Target Layer**, and click ***Set target***. The same panel shows what each constraint of the selection currently points at, so you can check a rig without opening the expressions.
+
+A newly created constraint has no target and does nothing until you set one.
+
+!!! note "Why the target isn't in the effect"
+    Because After Effects can't put it there. No effect parameter type holds a name — the whole set is layer, slider, angle, checkbox, colour, point, drop down, group and button — and effect parameters can't be renamed, so a parameter can't display one either. A layer control would be no help: it only ever lists the layers of its own composition. A name can live in one place only, the expression, so that's where Duik writes it, in a `DUIK_TARGETS` line keyed by the name of the effect:
+
+    ```js
+    var DUIK_TARGETS = {"Copy Location":["Character","Head"],"Copy Location.001":["Props","Hat"]};
+    ```
+
+    That line is plain enough to edit by hand if you'd rather retarget that way.
+
+!!! warning
+    The target is found by name, and the key is the name of the effect. So: don't rename the constraint effects, and set the target again after renaming a target composition or a target layer. Give your compositions unique names too — an expression reaches a composition only by name.
+
+!!! note
+    When the target is in another composition, its position and rotation are read in *that composition's* space; the constraint doesn't know how, or whether, that composition is nested into this one. **Transform units** on the copy location constraint is there to map the coordinates the way you want. If you need a layer to follow a precomp's content through the precomp layer's own transform, use [parent across compositions](parent.md) instead, which is built for that.
+
 ## ![](../../img/duik/icons/rotate.svg){style="width:1em;"} Orientation Constraint
 
 You can constrain the rotation of a layer to the orientation of other layers; that means the constrained layer will rotate according to the absolute orientation of the other layers, taking all parent rotations into account. The weight[*](../../misc/glossary.md) acts as a multiplier of the constraint and can be animated.
@@ -51,6 +99,37 @@ Just select the layer to constrain to, and set or animate its weight. To constra
 
 !!! tip
     When all orientation constraints are set to `0 %`, the constrained layer keeps its own orientation no matter what, even if it has a parent. That's an easy way to rig the gondolas of a ferris wheel for example, or the pedal of a bicycle.
+
+## ![](../../img/duik/icons/rotate.svg){style="width:1em;"} Copy Rotation
+
+This is an After Effects version of [Blender's *Copy Rotation* constraint](https://docs.blender.org/manual/en/latest/animation/constraints/transform/copy_rotation.html), the companion of the [copy location constraint](#copy-location) above. Where the orientation constraint adds a weighted share of the master layers' orientation, this one combines the rotation of the layer with the rotation of a single target using Blender's mix modes.
+
+Select the layers to constrain and click ![](../../img/duik/icons/rotate.svg){style="width:1em;"} ***Copy Rotation***, then set its target in the ***Constraint settings***. The effect is named `Copy Rotation`, and `Copy Rotation.001`, `Copy Rotation.002`... for the next ones on the same layer.
+
+- **Target**: picked in the Duik panel, not in the effect — see [choosing the target](#choosing-the-target). It can be a layer of any composition of the project.
+- **Invert**: negates the copied rotation.
+- **Mix mode**: how the copied rotation is combined with the layer's own rotation.
+    - ***Replace*** discards the rotation of the layer and uses the target's.
+    - ***Add*** adds the two rotations together.
+    - ***Before Original*** and ***After Original*** apply the copied rotation as if the target were respectively a parent or a child of the layer.
+    - ***Offset (Legacy)*** reproduces Blender's old *Offset* checkbox: it adds the two rotations and then inverts the total, instead of inverting only the copy.
+- **Target space** and **Owner space**: the space the rotation of the target is read in, and the space it is written to — ***World Space*** (the composition, every parent applied), ***Custom Space*** (relative to the layer set in **Custom space**) or ***Local Space*** (relative to the parent of the layer; a layer without a parent is already in world space).
+- **Influence**: blends between the original rotation of the layer and the constrained one. At `0 %` the constraint does nothing, at `100 %` it fully applies.
+
+You can duplicate the effect to stack several copy rotation constraints on the same layer: they're evaluated from top to bottom, each one starting from the result of the previous one, exactly like the constraint stack of Blender.
+
+!!! note
+    The constraint is computed live by an expression: it doesn't need any keyframe, neither on the layer nor on its target, and updates as soon as anything moves.
+
+!!! tip
+    Negatively scaled parents are handled: a layer under a mirrored parent copies the rotation as seen on screen, and a vertically flipped parent turns it the right way up.
+
+### Differences with Blender
+
+- **Only the Z axis.** After Effects drives each rotation axis as a separate property, and the whole rotation model of Duik works around the Z axis — the *Rotation* property of a layer, which is *Z Rotation* on a 3D layer. Blender's **Copy X**, **Copy Y** and **Copy Z** checkboxes are therefore not offered; unchecking Z would only disable the constraint, which the **Influence** does better. The *Orientation* of a 3D layer is read as part of its rotation, but is left untouched — the constraint writes to *Z Rotation* only.
+- Because rotations around a single axis add up, **Add**, **Before Original** and **After Original** give exactly the same result here. They're all listed anyway, so a rig ported from Blender can keep the mode it was built with. **Replace** and **Offset (Legacy)** do differ.
+- There's no **Transform units** here: a rotation is an angle, so it carries over between compositions of any size unchanged.
+- The influence blends the two angles **linearly**, where Blender interpolates the rotation matrices and so always takes the shortest way round. Linear blending keeps the winding of the angle, which is what an After Effects rig needs — a wheel that has turned three times keeps its three turns instead of snapping back.
 
 ## ![](../../img/duik/icons/bezier.svg){style="width:1em;"} Path Constraint
 

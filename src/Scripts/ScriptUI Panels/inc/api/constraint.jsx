@@ -3905,6 +3905,570 @@ Duik.Constraint.position = function(layers) {
     return effects;
 }
 
+/**
+ * Builds a name for a new constraint effect which isn't taken on the layer yet,
+ * numbering the duplicates the way Blender does: <code>Copy Location</code>, then
+ * <code>Copy Location.001</code>, <code>Copy Location.002</code>...<br />
+ * The name of the effect is what ties a constraint to its target, so it must be
+ * unique on the layer and shouldn't be changed afterwards.
+ * @param {Layer} layer The layer.
+ * @param {string} baseName The name of the effect.
+ * @return {string} The name to use.
+ */
+Duik.Constraint.uniqueEffectName = function(layer, baseName) {
+    var taken = {};
+    var effects = layer("ADBE Effect Parade");
+    for (var i = 1, n = effects.numProperties; i <= n; i++) {
+        taken[effects.property(i).name] = true;
+    }
+    if (!taken[baseName]) return baseName;
+
+    for (var i = 1; i < 1000; i++) {
+        var suffix = '' + i;
+        while (suffix.length < 3) suffix = '0' + suffix;
+        var name = baseName + '.' + suffix;
+        if (!taken[name]) return name;
+    }
+    return baseName;
+}
+
+/**
+ * Reads back the targets written in the expression of the constraints of a property.
+ * @private
+ * @param {string} expression The expression.
+ * @return {Object} The targets, as <code>{ effectName: [compName, layerName] }</code>.
+ */
+Duik.Constraint.bakedTargets = function(expression) {
+    if (!expression) return {};
+    var match = expression.match(/var DUIK_TARGETS = (\{.*\});/);
+    if (!match) return {};
+    try { return eval('(' + match[1] + ')'); }
+    catch (e) { return {}; }
+}
+
+/**
+ * The expression resolving the target of a constraint from the name of its
+ * composition and the name of the layer.<br />
+ * An expression has no access to the project: it can't list its compositions, and
+ * <code>comp()</code> only takes a name. There's no text parameter in an After
+ * Effects effect either, so the target can't be stored in the effect and is written
+ * in the expression itself, keyed by the name of the effect.
+ * @private
+ * @param {Object} [targets] The targets, as <code>{ effectName: [compName, layerName] }</code>.
+ * @return {string} The expression.
+ */
+Duik.Constraint.targetExpression = function(targets) {
+    targets = def(targets, {});
+
+    function quote(s) {
+        return '"' + DuString.replace(DuString.replace(s, '\\', '\\\\'), '"', '\\"') + '"';
+    }
+
+    var entries = [];
+    for (var name in targets) {
+        var t = targets[name];
+        if (!t) continue;
+        entries.push(quote(name) + ':[' + quote(t[0]) + ',' + quote(t[1]) + ']');
+    }
+
+    return [
+        '// The target of each constraint, as [ composition name, layer name ], written',
+        '// here by Duik: an expression can\'t list the compositions of the project, and',
+        '// an After Effects effect has no text parameter to hold a name. The key is the',
+        '// name of the effect, so don\'t rename the constraints.',
+        'var DUIK_TARGETS = {' + entries.join(',') + '};',
+        '',
+        'function targetOf(fx) {',
+        '    var t = DUIK_TARGETS[fx.name];',
+        '    if (!t) return null;',
+        '    try {',
+        '        var c = comp(t[0]);',
+        '        var l = c.layer(t[1]);',
+        '        // Constraining a layer to itself would be a circular reference.',
+        '        if (t[0] == thisComp.name && l.index == thisLayer.index) return null;',
+        '        return { layer: l, comp: c };',
+        '    }',
+        '    catch (e) { return null; }',
+        '}'
+    ].join('\n');
+}
+
+/**
+ * Writes the target of the copy location and copy rotation constraints of the layers.
+ * @private
+ * @param {Layer} layer - The constrained layer.
+ * @param {string} compName - The name of the composition holding the target.
+ * @param {string} layerName - The name of the target layer.
+ * @param {string[]} [only] - The names of the effects to retarget; all of them if omitted.
+ */
+Duik.Constraint.writeTarget = function(layer, compName, layerName, only) {
+    var location = [];
+    var rotation = [];
+
+    var effects = layer("ADBE Effect Parade");
+    for (var i = 1, n = effects.numProperties; i <= n; i++) {
+        var effect = effects.property(i);
+        if (isdef(only) && new DuList(only).indexOf(effect.name) < 0) continue;
+        if (effect.matchName.indexOf(Duik.PseudoEffect.COPY_LOCATION.matchName) == 0)
+            location.push(effect.name);
+        else if (effect.matchName.indexOf(Duik.PseudoEffect.COPY_ROTATION.matchName) == 0)
+            rotation.push(effect.name);
+    }
+
+    if (location.length > 0) {
+        var targets = Duik.Constraint.bakedTargets(layer.position.expression);
+        for (var i = 0, n = location.length; i < n; i++)
+            targets[location[i]] = [compName, layerName];
+        layer.position.expression = Duik.Constraint.copyLocationExpression(targets);
+    }
+
+    if (rotation.length > 0) {
+        var targets = Duik.Constraint.bakedTargets(layer.rotation.expression);
+        for (var i = 0, n = rotation.length; i < n; i++)
+            targets[rotation[i]] = [compName, layerName];
+        layer.rotation.expression = Duik.Constraint.copyRotationExpression(targets);
+    }
+}
+
+/**
+ * Lists what the copy location and copy rotation constraints of a layer currently
+ * point at. The target can't be shown in the effect itself: an After Effects effect
+ * has no parameter able to display a name, and effect parameters can't be renamed.
+ * @param {Layer} layer - The constrained layer.
+ * @return {Object[]} One <code>{ effect, comp, layer }</code> per constraint, in the
+ * order of the effects. <code>comp</code> and <code>layer</code> are empty strings
+ * when no target has been set yet.
+ */
+Duik.Constraint.getTargets = function(layer) {
+    var result = [];
+    if (!layer) return result;
+
+    var location = Duik.Constraint.bakedTargets(layer.position.expression);
+    var rotation = Duik.Constraint.bakedTargets(layer.rotation.expression);
+
+    var effects = layer("ADBE Effect Parade");
+    for (var i = 1, n = effects.numProperties; i <= n; i++) {
+        var effect = effects.property(i);
+        var targets = null;
+        if (effect.matchName.indexOf(Duik.PseudoEffect.COPY_LOCATION.matchName) == 0)
+            targets = location;
+        else if (effect.matchName.indexOf(Duik.PseudoEffect.COPY_ROTATION.matchName) == 0)
+            targets = rotation;
+        if (!targets) continue;
+
+        var t = targets[effect.name];
+        result.push({
+            effect: effect.name,
+            comp: t ? t[0] : '',
+            layer: t ? t[1] : ''
+        });
+    }
+
+    return result;
+}
+
+Duik.CmdLib['Constraint']["Set constraint target"] = "Duik.Constraint.setTarget()";
+/**
+ * Points every copy location and copy rotation constraint of the layers at a layer,
+ * which can live in any composition of the project.<br />
+ * The target is looked up by name, so run this again after renaming the composition
+ * or the target layer.
+ * @param {CompItem} comp - The composition holding the target.
+ * @param {Layer} target - The target layer.
+ * @param {Layer|Layer[]|DuList.<Layer>} [layers] - The constrained layers.
+ */
+Duik.Constraint.setTarget = function(comp, target, layers) {
+    if (!comp || !target) return;
+    layers = def(layers, DuAEComp.getSelectedLayers());
+    layers = new DuList(layers);
+    if (layers.length() == 0) return;
+
+    DuAE.beginUndoGroup( i18n._("Set constraint target"), false);
+
+    layers.do(function(layer) {
+        Duik.Constraint.writeTarget(layer, comp.name, target.name);
+    });
+
+    DuAE.endUndoGroup( i18n._("Set constraint target"));
+}
+
+/**
+ * Builds the expression of the copy location constraint.
+ * @private
+ * @param {Object} [targets] The targets, as <code>{ effectName: [compName, layerName] }</code>.
+ * @return {string} The expression.
+ */
+Duik.Constraint.copyLocationExpression = function(targets) {
+    var p = Duik.PseudoEffect.COPY_LOCATION.props;
+
+    return [DuAEExpression.Id.COPY_LOCATION_CONSTRAINT,
+        DuAEExpression.Library.get(['checkDuikEffect']),
+        Duik.Constraint.targetExpression(targets),
+        '',
+        '// The transform units, in the order of the drop down of the effect.',
+        'var PIXELS = 1;',
+        'var PERCENTAGE = 2;',
+        'var CUSTOM_RATIO = 3;',
+        '',
+        '// The spaces, in the order of the drop downs of the effect.',
+        'var WORLD_SPACE = 1;',
+        'var CUSTOM_SPACE = 2;',
+        'var LOCAL_SPACE = 3;',
+        '',
+        '// Everything is computed with three components,',
+        '// whatever the dimensions of the layers.',
+        'function d3(p) {',
+        '    if (p.length > 2) return [ p[0], p[1], p[2] ];',
+        '    return [ p[0], p[1], 0 ];',
+        '}',
+        '',
+        '// The location of the anchor point of a layer, in the space of its own comp.',
+        'function worldLocation(l) {',
+        '    return d3( l.toWorld( l.anchorPoint ) );',
+        '}',
+        '',
+        '// Comp space <-> the space the position of a layer is expressed in.',
+        '// A layer without a parent is already in comp space.',
+        'function toLocal(l, p) {',
+        '    if (!l.hasParent) return d3(p);',
+        '    return d3( l.parent.fromWorld(p) );',
+        '}',
+        'function fromLocal(l, p) {',
+        '    if (!l.hasParent) return d3(p);',
+        '    return d3( l.parent.toWorld(p) );',
+        '}',
+        '',
+        '// How the coordinates of the target composition are read into this one.',
+        'function unitFactor(fx, targetComp) {',
+        '    var units = fx(' + p['Transform units'].index + ').value;',
+        '    if (units == PERCENTAGE) {',
+        '        // The same relative spot, whatever the resolution of the comps.',
+        '        var sx = thisComp.width / targetComp.width;',
+        '        var sy = thisComp.height / targetComp.height;',
+        '        return [sx, sy, sx];',
+        '    }',
+        '    if (units == CUSTOM_RATIO) {',
+        '        var r = fx(' + p['Custom ratio'].index + ').value;',
+        '        return [r, r, r];',
+        '    }',
+        '    return [1, 1, 1];',
+        '}',
+        '',
+        '// The location of this layer in comp space, before any constraint.',
+        'var ownerLocation = fromLocal( thisLayer, d3(value) );',
+        'var constrained = false;',
+        '',
+        'for ( var i = 1, n = thisLayer("Effects").numProperties; i <= n; i++ ) {',
+        '    var fx = thisLayer.effect(i);',
+        '    if ( !checkDuikEffect(fx, "DUIK copyLocation") ) continue;',
+        '    if ( !fx.active ) continue;',
+        '',
+        '    var t = targetOf(fx);',
+        '    if (!t) continue;',
+        '    var target = t.layer;',
+        '',
+        '    var customSpace = null;',
+        '    try { customSpace = fx( ' + p['Custom space'].index + ' ); }',
+        '    catch (e) {}',
+        '',
+        '    var targetSpace = fx( ' + p['Target space'].index + ' ).value;',
+        '    var ownerSpace = fx( ' + p['Owner space'].index + ' ).value;',
+        '',
+        '    // The location of the target, read in the target space.',
+        '    var targetLocation = worldLocation(target);',
+        '    if (targetSpace == CUSTOM_SPACE && customSpace)',
+        '        targetLocation = d3( customSpace.fromWorld(targetLocation) );',
+        '    else if (targetSpace == LOCAL_SPACE)',
+        '        targetLocation = toLocal(target, targetLocation);',
+        '',
+        '    // Scale the coordinates of the target composition into this one.',
+        '    var factor = unitFactor(fx, t.comp);',
+        '    targetLocation = [ targetLocation[0] * factor[0],',
+        '                       targetLocation[1] * factor[1],',
+        '                       targetLocation[2] * factor[2] ];',
+        '',
+        '    // The location of this layer, in the owner space.',
+        '    var ownerSpaceLocation = d3(ownerLocation);',
+        '    if (ownerSpace == CUSTOM_SPACE && customSpace)',
+        '        ownerSpaceLocation = d3( customSpace.fromWorld(ownerSpaceLocation) );',
+        '    else if (ownerSpace == LOCAL_SPACE)',
+        '        ownerSpaceLocation = toLocal(thisLayer, ownerSpaceLocation);',
+        '',
+        '    var axis = [ fx(' + p['X'].index + ').value, fx(' + p['Y'].index + ').value, fx(' + p['Z'].index + ').value ];',
+        '    var invert = [ fx(' + p['Invert X'].index + ').value, fx(' + p['Invert Y'].index + ').value, fx(' + p['Invert Z'].index + ').value ];',
+        '    var offset = fx(' + p['Offset'].index + ').value;',
+        '',
+        '    // Copy the enabled axis, keep the others.',
+        '    var location = d3(ownerSpaceLocation);',
+        '    for (var a = 0; a < 3; a++) {',
+        '        if (!axis[a]) continue;',
+        '        var v = targetLocation[a];',
+        '        if (invert[a]) v = -v;',
+        '        if (offset) v += ownerSpaceLocation[a];',
+        '        location[a] = v;',
+        '    }',
+        '',
+        '    // Back to comp space.',
+        '    if (ownerSpace == CUSTOM_SPACE && customSpace)',
+        '        location = d3( customSpace.toWorld(location) );',
+        '    else if (ownerSpace == LOCAL_SPACE)',
+        '        location = fromLocal(thisLayer, location);',
+        '',
+        '    // Blend with the influence in comp space, like Blender does, so that',
+        '    // several of these effects can be stacked on the same layer.',
+        '    var influence = fx(' + p['Influence'].index + ').value / 100;',
+        '    for (var b = 0; b < 3; b++) {',
+        '        ownerLocation[b] += (location[b] - ownerLocation[b]) * influence;',
+        '    }',
+        '    constrained = true;',
+        '}',
+        '',
+        'var result = value;',
+        'if (constrained) {',
+        '    var loc = toLocal( thisLayer, ownerLocation );',
+        '    result = value.length > 2 ? loc : [ loc[0], loc[1] ];',
+        '}',
+        'result;',
+        ''
+    ].join('\n');
+}
+
+Duik.CmdLib['Constraint']["Copy Location"] = "Duik.Constraint.copyLocation()";
+/**
+ * Adds a <i>copy location</i> constraint to the layers.<br />
+ * This is an After Effects recreation of Blender's <i>Copy Location</i> constraint:
+ * the location of the layer is replaced by the location of a target layer, one axis
+ * at a time, with optional inversion and offset, in a choice of spaces, and blended
+ * back with an influence.<br />
+ * The target is a layer of any composition of the project, picked in the Duik panel
+ * and looked up by name; it can be changed later with {@link Duik.Constraint.setTarget}.<br />
+ * Several of these effects can be added on the same layer; they're evaluated in
+ * order, the same way Blender stacks constraints.<br />
+ * The constraint is computed live by an expression and never needs a keyframe.
+ * @param {CompItem} comp - The composition holding the target.
+ * @param {Layer} target - The target layer.
+ * @param {Layer|Layer[]|DuList.<Layer>} [layers] - The constrained layers.
+ * @return {Property[]} The effects added on the layers to control the constraint.
+ */
+Duik.Constraint.copyLocation = function(comp, target, layers) {
+    layers = def(layers, DuAEComp.unselectLayers());
+    layers = new DuList(layers);
+
+    DuAE.beginUndoGroup( i18n._("Copy Location"), false);
+
+    var pe = Duik.PseudoEffect.COPY_LOCATION;
+    var effects = [];
+
+    layers.do(function(layer) {
+        // The name of the effect is the key of its target, so it has to be unique.
+        var name = Duik.Constraint.uniqueEffectName(layer, pe.name);
+        var effect = pe.apply(layer, name);
+        effects.push(effect);
+
+        var targets = Duik.Constraint.bakedTargets(layer.position.expression);
+        if (comp && target) targets[name] = [comp.name, target.name];
+        layer.position.expression = Duik.Constraint.copyLocationExpression(targets);
+    });
+
+    DuAEComp.selectLayers(layers);
+
+    DuAE.endUndoGroup( i18n._("Copy Location"));
+
+    return effects;
+}
+
+/**
+ * Builds the expression of the copy rotation constraint.
+ * @private
+ * @param {Object} [targets] The targets, as <code>{ effectName: [compName, layerName] }</code>.
+ * @return {string} The expression.
+ */
+Duik.Constraint.copyRotationExpression = function(targets) {
+    var p = Duik.PseudoEffect.COPY_ROTATION.props;
+
+    return [DuAEExpression.Id.COPY_ROTATION_CONSTRAINT,
+        DuAEExpression.Library.get(['checkDuikEffect', 'sign']),
+        Duik.Constraint.targetExpression(targets),
+        '',
+        '// The mix modes, in the order of the drop down of the effect.',
+        'var REPLACE = 1;',
+        'var ADD = 2;',
+        'var BEFORE_ORIGINAL = 3;',
+        'var AFTER_ORIGINAL = 4;',
+        'var OFFSET_LEGACY = 5;',
+        '',
+        '// The spaces, in the order of the drop downs of the effect.',
+        'var WORLD_SPACE = 1;',
+        'var CUSTOM_SPACE = 2;',
+        'var LOCAL_SPACE = 3;',
+        '',
+        '// The rotation of a layer around Z, relative to its parent.',
+        '// The orientation of 3D layers is a part of it.',
+        'function localRotation(l) {',
+        '    var r = l.rotation.value;',
+        '    if (l.position.value.length == 3) r += l.orientation.value[2];',
+        '    return r;',
+        '}',
+        '',
+        '// A negatively scaled parent mirrors the rotation of its children,',
+        '// and a vertical flip turns them upside down.',
+        'function scaleMirror(l) {',
+        '    var m = 1;',
+        '    while (l.hasParent) {',
+        '        l = l.parent;',
+        '        var s = l.scale.value;',
+        '        m *= Math.sign(s[0] * s[1]);',
+        '    }',
+        '    return m;',
+        '}',
+        'function scaleUTurn(l) {',
+        '    var u = 1;',
+        '    while (l.hasParent) {',
+        '        l = l.parent;',
+        '        u = u * l.scale.value[1];',
+        '    }',
+        '    if (u < 0) return 180;',
+        '    return 0;',
+        '}',
+        '',
+        '// The rotation of a layer in the space of its own comp, every parent applied.',
+        'function worldRotation(l) {',
+        '    var r = localRotation(l) * scaleMirror(l) + scaleUTurn(l);',
+        '    while (l.hasParent) {',
+        '        l = l.parent;',
+        '        var lr = localRotation(l);',
+        '        if (l.hasParent) {',
+        '            var s = l.parent.scale.value;',
+        '            lr *= Math.sign(s[0] * s[1]);',
+        '        }',
+        '        r += lr;',
+        '    }',
+        '    return r;',
+        '}',
+        '',
+        '// Comp space <-> the space the rotation of this layer is expressed in.',
+        '// The contribution of the parents is constant, so it can be taken out',
+        '// once and used to convert both ways without reading our own rotation.',
+        'var orientation = 0;',
+        'if (thisLayer.position.value.length == 3) orientation = thisLayer.orientation.value[2];',
+        'var mirror = scaleMirror(thisLayer);',
+        'var uTurn = scaleUTurn(thisLayer);',
+        'var parents = worldRotation(thisLayer) - localRotation(thisLayer) * mirror - uTurn;',
+        'function toWorldRotation(r) { return r * mirror + uTurn + parents; }',
+        'function toLocalRotation(r) { return (r - uTurn - parents) * mirror; }',
+        '',
+        '// The rotation of this layer in comp space, before any constraint.',
+        'var ownerRotation = toWorldRotation( value + orientation );',
+        'var constrained = false;',
+        '',
+        'for ( var i = 1, n = thisLayer("Effects").numProperties; i <= n; i++ ) {',
+        '    var fx = thisLayer.effect(i);',
+        '    if ( !checkDuikEffect(fx, "DUIK copyRotation") ) continue;',
+        '    if ( !fx.active ) continue;',
+        '',
+        '    var t = targetOf(fx);',
+        '    if (!t) continue;',
+        '    var target = t.layer;',
+        '',
+        '    var customSpace = null;',
+        '    try { customSpace = fx( ' + p['Custom space'].index + ' ); }',
+        '    catch (e) {}',
+        '    var customRotation = 0;',
+        '    if (customSpace) customRotation = worldRotation(customSpace);',
+        '',
+        '    var targetSpace = fx( ' + p['Target space'].index + ' ).value;',
+        '    var ownerSpace = fx( ' + p['Owner space'].index + ' ).value;',
+        '',
+        '    // The rotation of the target, read in the target space.',
+        '    var targetRotation = worldRotation(target);',
+        '    if (targetSpace == CUSTOM_SPACE && customSpace) targetRotation -= customRotation;',
+        '    else if (targetSpace == LOCAL_SPACE) targetRotation = localRotation(target);',
+        '',
+        '    // The rotation of this layer, in the owner space.',
+        '    var ownRotation = ownerRotation;',
+        '    if (ownerSpace == CUSTOM_SPACE && customSpace) ownRotation -= customRotation;',
+        '    else if (ownerSpace == LOCAL_SPACE) ownRotation = toLocalRotation(ownerRotation);',
+        '',
+        '    var invert = fx(' + p['Invert'].index + ').value;',
+        '    var mixMode = fx(' + p['Mix mode'].index + ').value;',
+        '',
+        '    // Around a single axis, rotations commute and combine by adding their',
+        '    // angles, so "Add", "Before Original" and "After Original" coincide.',
+        '    // "Offset (Legacy)" differs: it inverts the sum instead of the copy.',
+        '    var rotation;',
+        '    if (mixMode == OFFSET_LEGACY) {',
+        '        rotation = targetRotation + ownRotation;',
+        '        if (invert) rotation = -rotation;',
+        '    }',
+        '    else {',
+        '        rotation = invert ? -targetRotation : targetRotation;',
+        '        if (mixMode != REPLACE) rotation += ownRotation;',
+        '    }',
+        '',
+        '    // Back to comp space.',
+        '    if (ownerSpace == CUSTOM_SPACE && customSpace) rotation += customRotation;',
+        '    else if (ownerSpace == LOCAL_SPACE) rotation = toWorldRotation(rotation);',
+        '',
+        '    // Blend with the influence in comp space, like Blender does, so that',
+        '    // several of these effects can be stacked on the same layer.',
+        '    var influence = fx(' + p['Influence'].index + ').value / 100;',
+        '    ownerRotation += (rotation - ownerRotation) * influence;',
+        '    constrained = true;',
+        '}',
+        '',
+        'var result = value;',
+        'if (constrained) result = toLocalRotation(ownerRotation) - orientation;',
+        'result;',
+        ''
+    ].join('\n');
+}
+
+Duik.CmdLib['Constraint']["Copy Rotation"] = "Duik.Constraint.copyRotation()";
+/**
+ * Adds a <i>copy rotation</i> constraint to the layers.<br />
+ * This is an After Effects recreation of Blender's <i>Copy Rotation</i> constraint:
+ * the rotation of the layer is combined with the rotation of a target layer, with a
+ * choice of mix modes and spaces, and blended back with an influence.<br />
+ * Like the rest of Duik, this works on the rotation around the Z axis, which is the
+ * <i>Rotation</i> property of the layer (the orientation of 3D layers is taken into
+ * account when reading the rotation of the layers, but is left untouched).<br />
+ * The target is a layer of any composition of the project, picked in the Duik panel
+ * and looked up by name; it can be changed later with {@link Duik.Constraint.setTarget}.<br />
+ * Several of these effects can be added on the same layer; they're evaluated in
+ * order, the same way Blender stacks constraints.<br />
+ * The constraint is computed live by an expression and never needs a keyframe.
+ * @param {CompItem} comp - The composition holding the target.
+ * @param {Layer} target - The target layer.
+ * @param {Layer|Layer[]|DuList.<Layer>} [layers] - The constrained layers.
+ * @return {Property[]} The effects added on the layers to control the constraint.
+ */
+Duik.Constraint.copyRotation = function(comp, target, layers) {
+    layers = def(layers, DuAEComp.unselectLayers());
+    layers = new DuList(layers);
+
+    DuAE.beginUndoGroup( i18n._("Copy Rotation"), false);
+
+    var pe = Duik.PseudoEffect.COPY_ROTATION;
+    var effects = [];
+
+    layers.do(function(layer) {
+        // The name of the effect is the key of its target, so it has to be unique.
+        var name = Duik.Constraint.uniqueEffectName(layer, pe.name);
+        var effect = pe.apply(layer, name);
+        effects.push(effect);
+
+        var targets = Duik.Constraint.bakedTargets(layer.rotation.expression);
+        if (comp && target) targets[name] = [comp.name, target.name];
+        layer.rotation.expression = Duik.Constraint.copyRotationExpression(targets);
+    });
+
+    DuAEComp.selectLayers(layers);
+
+    DuAE.endUndoGroup( i18n._("Copy Rotation"));
+
+    return effects;
+}
+
 Duik.CmdLib['Constraint']["Orientation"] = "Duik.Constraint.orientation()";
 /**
  * Adds an orientation constraint to the layers

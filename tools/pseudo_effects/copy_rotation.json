@@ -1,0 +1,113 @@
+{
+    "file": "pe_copy_rotation",
+    "controlName": "Copy Rotation",
+    "matchname": "Pseudo/DUIK copyRotation v2",
+    "controlArray": [
+        {
+            "index": 0,
+            "name": "DUIK Data",
+            "parent": null,
+            "type": "group",
+            "container": null,
+            "invisible": true
+        },
+        {
+            "index": 0,
+            "name": "DUIK copyRotation",
+            "hold": true,
+            "parent": null,
+            "type": "checkbox",
+            "keyframes": true,
+            "invisible": true,
+            "default": true,
+            "label": ""
+        },
+        {
+            "type": "endgroup"
+        },
+        {
+            "index": 1,
+            "name": "Target: set it in Duik",
+            "parent": null,
+            "type": "text",
+            "dim": true
+        },
+        {
+            "index": 2,
+            "name": "Invert",
+            "hold": true,
+            "parent": null,
+            "type": "checkbox",
+            "keyframes": true,
+            "invisible": false,
+            "default": false,
+            "label": ""
+        },
+        {
+            "index": 3,
+            "name": "Mix mode",
+            "hold": true,
+            "parent": null,
+            "type": "popup",
+            "keyframes": false,
+            "invisible": false,
+            "default": 1,
+            "options": "Replace|Add|Before Original|After Original|Offset (Legacy)"
+        },
+        {
+            "index": 4,
+            "name": "Spaces",
+            "parent": null,
+            "type": "text",
+            "dim": true
+        },
+        {
+            "index": 5,
+            "name": "Target space",
+            "hold": true,
+            "parent": null,
+            "type": "popup",
+            "keyframes": false,
+            "invisible": false,
+            "default": 1,
+            "options": "World Space|Custom Space|Local Space"
+        },
+        {
+            "index": 6,
+            "name": "Owner space",
+            "hold": true,
+            "parent": null,
+            "type": "popup",
+            "keyframes": false,
+            "invisible": false,
+            "default": 1,
+            "options": "World Space|Custom Space|Local Space"
+        },
+        {
+            "index": 7,
+            "name": "Custom space",
+            "parent": null,
+            "type": "layer",
+            "invisible": false,
+            "default": false
+        },
+        {
+            "index": 8,
+            "name": "Influence",
+            "hold": false,
+            "parent": null,
+            "type": "slider",
+            "keyframes": true,
+            "invisible": false,
+            "default": 100,
+            "smin": 0,
+            "smax": 100,
+            "vmin": 0,
+            "vmax": 100,
+            "precision": "1",
+            "percent": true,
+            "pixel": false,
+            "active": true
+        }
+    ]
+}
