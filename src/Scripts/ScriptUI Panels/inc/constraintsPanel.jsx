@@ -65,9 +65,22 @@ function buildConstraintsUI(tab, standAlone) {
     var constraintSettingsButton = toolsGroup.addButton(
         i18n._("Constraint settings"),
         DuScriptUI.Icon.SETTINGS,
-        i18n._("Set the target of the copy location and copy rotation constraints of the selected layers.")
+        i18n._("Set the target of the copy location and copy rotation constraints of the selected layers.") + "\n\n" +
+            i18n._("[Alt]: Launches the corresponding ScriptUI Stand-Alone panel if it is installed.")
     );
     constraintSettingsButton.onClick = function() { showConstraintSettings(); };
+    constraintSettingsButton.onAltClick = openConstraintSettingsPanel;
+
+    var applyConstraintButton = toolsGroup.addButton(
+        i18n._("Apply Constraint"),
+        w12_bake,
+        i18n._("Apply the selected copy location and copy rotation constraints, like in Blender: " +
+                "their result at the current time becomes the value of the layer, and the effects are removed.")
+    );
+    applyConstraintButton.onClick = function() {
+        if (Duik.Constraint.apply() == 0)
+            alert(i18n._("Select the copy location or copy rotation effects to apply first."));
+    };
 
     var moveAnchorPointButton = createMoveAnchorPointButton(toolsGroup, mainGroup, hideAllGroups);
     moveAnchorPointButton.onClick = function() {
@@ -1460,7 +1473,7 @@ function buildConstraintsUI(tab, standAlone) {
 
         var copyLocationConstraintButton = this.addButton(
             i18n._("Copy Location"),
-            w16_move,
+            w16_con_loclike,
             i18n._("Replace the location of a layer with the location of another one.\n\n" +
                     "An After Effects version of Blender's \"Copy Location\" constraint: " +
                     "each axis can be copied, inverted or offset separately, in a choice of spaces.")
@@ -1476,7 +1489,7 @@ function buildConstraintsUI(tab, standAlone) {
 
         var copyRotationConstraintButton = this.addButton(
             i18n._("Copy Rotation"),
-            w16_rotate,
+            w16_con_rotlike,
             i18n._("Combine the rotation of a layer with the rotation of another one.\n\n" +
                     "An After Effects version of Blender's \"Copy Rotation\" constraint, " +
                     "with its mix modes and spaces. Works on the rotation around the Z axis.")
@@ -1565,125 +1578,41 @@ function buildConstraintsUI(tab, standAlone) {
     parentAcrossCompGroup.visible = false;
     parentAcrossCompGroup.built = false;
 
-    // The copy location and copy rotation constraints look their target up by name.
-    // The target can't live in the effect: an After Effects effect has no parameter
-    // type able to hold or display a name, and effect parameters can't be renamed.
+    // The settings are shared with their own dockable panel, Duik Constraint Settings.jsx.
+    #include "constraintSettingsPanel.jsx"
     var constraintSettingsGroup = DuScriptUI.group(mainGroup, 'column');
     constraintSettingsGroup.visible = false;
     constraintSettingsGroup.built = false;
-    var settingsCompSelector;
-    var settingsLayerSelector;
-    var settingsTargetText;
-    var settingsTargetValidButton;
+    var constraintSettings;
 
-    function settingsTarget() {
-        var comp = settingsCompSelector.getComp();
-        if (!comp) return null;
-        if (settingsLayerSelector.index <= 0) return null;
-        return { comp: comp, layer: comp.layer(settingsLayerSelector.index) };
-    }
-
-    // Shows what the constraints of the selected layer currently point at.
-    function refreshConstraintTargets() {
-        if (!settingsTargetText) return;
-
-        var layers = DuAEComp.getSelectedLayers();
-        if (layers.length == 0) {
-            settingsTargetText.text = i18n._("Select a constrained layer.");
-            return;
-        }
-
-        var lines = [];
-        for (var i = 0, n = layers.length; i < n; i++) {
-            var targets = Duik.Constraint.getTargets(layers[i]);
-            for (var j = 0, m = targets.length; j < m; j++) {
-                var t = targets[j];
-                if (t.comp == '') lines.push(t.effect + ': ' + i18n._("no target"));
-                else lines.push(t.effect + ': ' + t.comp + ' / ' + t.layer);
-            }
-        }
-
-        if (lines.length == 0) settingsTargetText.text = i18n._("No copy constraint on the selection.");
-        else settingsTargetText.text = lines.join('\n');
+    function openConstraintSettingsPanel() {
+        DuAE.openScriptUIPanel( "Duik Constraint Settings.jsx" );
     }
 
     function showConstraintSettings() {
         if (!constraintSettingsGroup.built) {
-            var titleBar = createSubPanel(
+            createSubPanel(
                 constraintSettingsGroup,
                 i18n._("Constraint settings"),
                 constraintsGroup
             );
 
-            DuScriptUI.separator( constraintSettingsGroup, i18n._("Current target") );
-
-            settingsTargetText = constraintSettingsGroup.add(
-                'statictext',
-                undefined,
-                i18n._("Select a constrained layer."),
-                { multiline: true }
-            );
-            settingsTargetText.alignment = ['fill', 'top'];
-            settingsTargetText.minimumSize = [-1, 48];
-
-            var refreshButton = DuScriptUI.button(
+            var popOutButton = DuScriptUI.button(
                 constraintSettingsGroup,
-                i18n._("Refresh"),
-                w16_update_expression,
-                i18n._("Show what the copy location and copy rotation constraints of the selected layers point at.")
+                i18n._("Pop out"),
+                w12_dock,
+                i18n._("Open the constraint settings in their own panel, which can be docked anywhere in the After Effects interface.")
             );
-            refreshButton.onClick = refreshConstraintTargets;
+            popOutButton.onClick = openConstraintSettingsPanel;
 
-            DuScriptUI.separator( constraintSettingsGroup, i18n._("Set target") );
-
-            DuScriptUI.staticText(
-                constraintSettingsGroup,
-                i18n._("Target Composition") + ':',
-                undefined,
-                false
-            );
-
-            settingsCompSelector = DuScriptUI.compSelector(constraintSettingsGroup);
-            settingsCompSelector.onChange = function() {
-                var comp = settingsCompSelector.getComp();
-                if (!comp) return;
-                settingsLayerSelector.comp = comp;
-                settingsLayerSelector.refresh();
-            }
-
-            DuScriptUI.staticText(
-                constraintSettingsGroup,
-                i18n._("Target Layer") + ':',
-                undefined,
-                false
-            );
-
-            settingsLayerSelector = DuScriptUI.layerSelector(constraintSettingsGroup);
-            settingsLayerSelector.onChange = function() {
-                settingsTargetValidButton.enabled = settingsLayerSelector.index > 0;
-            }
-
-            settingsTargetValidButton = addValidButton(
-                constraintSettingsGroup,
-                i18n._("Set target"),
-                i18n._("Point the copy location and copy rotation constraints of the selected layers at this layer.\n\n" +
-                        "The target is looked up by name: set it again after renaming the composition or the layer.")
-            );
-            settingsTargetValidButton.enabled = false;
-            settingsTargetValidButton.onClick = function() {
-                var t = settingsTarget();
-                if (!t) return;
-                Duik.Constraint.setTarget(t.comp, t.layer);
-                refreshConstraintTargets();
-            }
+            constraintSettings = buildConstraintSettingsUI(constraintSettingsGroup);
 
             DuScriptUI.showUI(constraintSettingsGroup);
-            constraintSettingsGroup.built = true;
         }
 
         hideAllGroups();
         constraintSettingsGroup.visible = true;
-        refreshConstraintTargets();
+        constraintSettings.refresh();
     }
 
     var pathConstraintValidButton;

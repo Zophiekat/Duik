@@ -119,6 +119,8 @@
 #include "icons/w16/w16_composition.png.jsxinc"
 #include "icons/w16/w16_compositions.png.jsxinc"
 #include "icons/w16/w16_composition_settings.png.jsxinc"
+#include "icons/w16/w16_con_loclike.png.jsxinc"
+#include "icons/w16/w16_con_rotlike.png.jsxinc"
 #include "icons/w16/w16_connector.png.jsxinc"
 #include "icons/w16/w16_constraint.png.jsxinc"
 #include "icons/w16/w16_controller.png.jsxinc"

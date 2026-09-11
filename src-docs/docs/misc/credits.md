@@ -49,6 +49,10 @@ Special thanks to all the supporters of Duduf on *Patreon*, the [Silver and Gold
 Epistemex  
 Licensed under the MIT License
 
+- [Blender](https://www.blender.org){target="_blank"} icons (*Copy Location* and *Copy Rotation* constraints)  
+Copyright © Blender Authors  
+Licensed under the GNU General Public License
+
 - [ColorPicker](http://github.com/Smallpath/AdobeColorPicker)  
 smallpath  
 Licensed under the MIT License
@@ -88,6 +92,8 @@ Unless stated otherwise, for all pictures, icons, videos, and other materials co
 All pictures and medias without their credits on the same page are by Nicolas Dufresne and licensed under the [GNU Free Documentation License](doc-license.md).
 
 This document also include some icons by Font Awesome, released under the Create Commons Attribution 4.0 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.en){target="_blank"} license, [fontawesome.com](https://fontawesome.com/){target="_blank"}
+
+The *Copy Location* and *Copy Rotation* icons are from [Blender](https://www.blender.org){target="_blank"}, by the Blender Authors, released under the GNU General Public License.
 
 ### Composition
 

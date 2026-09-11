@@ -32,11 +32,11 @@ Just select the layer to constrain to, and set or animate its weight. To constra
 !!! note
     Because this constraint depends on the specific location of the layers at the beginning of the composition, you won't see the effect of the position constraint until there's an actual animation (using keyframes or expressions) on the master layers, and at the very first frame of the composition.
 
-## ![](../../img/duik/icons/move.svg){style="width:1em;"} Copy Location
+## ![](../../img/duik/icons/con_loclike.svg){style="width:1em;"} Copy Location
 
 This is an After Effects version of [Blender's *Copy Location* constraint](https://docs.blender.org/manual/en/latest/animation/constraints/transform/copy_location.html). Where the position constraint above *adds* the movement of the master layers to the layer's own position, the copy location constraint *replaces* the location of the layer with the location of its target, one axis at a time.
 
-Select the layers to constrain and click ![](../../img/duik/icons/move.svg){style="width:1em;"} ***Copy Location***, then set its target in the ***Constraint settings***. The effect is named `Copy Location`, and `Copy Location.001`, `Copy Location.002`... for the next ones on the same layer.
+Select the layers to constrain and click ![](../../img/duik/icons/con_loclike.svg){style="width:1em;"} ***Copy Location***, then set its target in the ***Constraint settings***. The effect is named `Copy Location`, and `Copy Location.001`, `Copy Location.002`... for the next ones on the same layer.
 
 - **Target**: picked in the Duik panel, not in the effect — see [choosing the target](#choosing-the-target). It can be a layer of any composition of the project.
 - **Transform units**: how the coordinates of the target composition are read into this one.
@@ -61,9 +61,13 @@ You can duplicate the effect to stack several copy location constraints on the s
 
 ### Choosing the target
 
-The target is set in the ***Constraint settings***, opened with the gear button in the toolbar at the top of the panel. Select the constrained layers, pick a **Target Composition** and a **Target Layer**, and click ***Set target***. The same panel shows what each constraint of the selection currently points at, so you can check a rig without opening the expressions.
+The target is set in the ***Constraint settings***, opened with the ![](../../img/duik/icons/settings.svg){style="width:1em;"} gear button in the toolbar at the top of the panel. Select the constrained layers, pick a **Target Composition** and a **Target Layer**, and click ***Set target***. The same panel shows what each constraint of the selection currently points at, so you can check a rig without opening the expressions.
 
 A newly created constraint has no target and does nothing until you set one.
+
+!!! tip
+    The constraint settings can also live in their own panel, docked anywhere in the After Effects interface: click ![](../../img/duik/icons/dock.svg){style="width:1em;"} ***Pop out*** at the top of the settings, or `[Alt] + [Click]` the gear button. This launches the *Duik Constraint Settings* panel, which has to be [installed](../../getting-started/install.md) like the other Duik panels.  
+    After Effects doesn't tell scripts when the selection changes, so click ***Refresh*** to show the targets of the newly selected layers.
 
 !!! note "Why the target isn't in the effect"
     Because After Effects can't put it there. No effect parameter type holds a name — the whole set is layer, slider, angle, checkbox, colour, point, drop down, group and button — and effect parameters can't be renamed, so a parameter can't display one either. A layer control would be no help: it only ever lists the layers of its own composition. A name can live in one place only, the expression, so that's where Duik writes it, in a `DUIK_TARGETS` line keyed by the name of the effect:
@@ -79,6 +83,20 @@ A newly created constraint has no target and does nothing until you set one.
 
 !!! note
     When the target is in another composition, its position and rotation are read in *that composition's* space; the constraint doesn't know how, or whether, that composition is nested into this one. **Transform units** on the copy location constraint is there to map the coordinates the way you want. If you need a layer to follow a precomp's content through the precomp layer's own transform, use [parent across compositions](parent.md) instead, which is built for that.
+
+### Applying a constraint
+
+As in Blender, a copy location or copy rotation constraint can be *applied*: its result becomes the actual position or rotation of the layer, and the constraint is removed.
+
+Select the constraint effects, in the *Effect Controls* panel or in the timeline (selecting one of their parameters works too), and click ![](../../img/duik/icons/bake.svg){style="width:1em;"} ***Apply Constraint*** in the toolbar at the top of the panel.
+
+- The constraint is evaluated at the **current time** only: if its target moves later on, the layer doesn't follow it anymore.
+- If the position or rotation is **animated**, the value is set with a keyframe at the current time, just like when editing an animated value by hand. A constraint which doesn't change the value — no target, a disabled effect, an influence of `0 %` — is simply removed, without adding a keyframe.
+- When the last constraint of its kind is applied, its expression is removed too, and the property is free again.
+
+!!! warning
+    The constraint is evaluated **alone**, on the unconstrained value of the layer; the other constraints stay in place. Applying the first constraint of a stack keeps the layer where it is, but applying one further down may move it, because the constraints above it now start from its result instead of the other way around. Blender behaves the same way.  
+    To apply a whole stack, select all of its effects: they're applied from top to bottom, and the layer doesn't move.
 
 ## ![](../../img/duik/icons/rotate.svg){style="width:1em;"} Orientation Constraint
 
@@ -100,11 +118,11 @@ Just select the layer to constrain to, and set or animate its weight. To constra
 !!! tip
     When all orientation constraints are set to `0 %`, the constrained layer keeps its own orientation no matter what, even if it has a parent. That's an easy way to rig the gondolas of a ferris wheel for example, or the pedal of a bicycle.
 
-## ![](../../img/duik/icons/rotate.svg){style="width:1em;"} Copy Rotation
+## ![](../../img/duik/icons/con_rotlike.svg){style="width:1em;"} Copy Rotation
 
 This is an After Effects version of [Blender's *Copy Rotation* constraint](https://docs.blender.org/manual/en/latest/animation/constraints/transform/copy_rotation.html), the companion of the [copy location constraint](#copy-location) above. Where the orientation constraint adds a weighted share of the master layers' orientation, this one combines the rotation of the layer with the rotation of a single target using Blender's mix modes.
 
-Select the layers to constrain and click ![](../../img/duik/icons/rotate.svg){style="width:1em;"} ***Copy Rotation***, then set its target in the ***Constraint settings***. The effect is named `Copy Rotation`, and `Copy Rotation.001`, `Copy Rotation.002`... for the next ones on the same layer.
+Select the layers to constrain and click ![](../../img/duik/icons/con_rotlike.svg){style="width:1em;"} ***Copy Rotation***, then set its target in the ***Constraint settings***. The effect is named `Copy Rotation`, and `Copy Rotation.001`, `Copy Rotation.002`... for the next ones on the same layer.
 
 - **Target**: picked in the Duik panel, not in the effect — see [choosing the target](#choosing-the-target). It can be a layer of any composition of the project.
 - **Invert**: negates the copied rotation.
