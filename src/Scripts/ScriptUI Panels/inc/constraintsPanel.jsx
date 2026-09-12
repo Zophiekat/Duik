@@ -65,7 +65,7 @@ function buildConstraintsUI(tab, standAlone) {
     var constraintSettingsButton = toolsGroup.addButton(
         i18n._("Constraint settings"),
         DuScriptUI.Icon.SETTINGS,
-        i18n._("Set the target of the copy location and copy rotation constraints of the selected layers.") + "\n\n" +
+        i18n._("Show and set the target of the selected copy location or copy rotation constraint.") + "\n\n" +
             i18n._("[Alt]: Launches the corresponding ScriptUI Stand-Alone panel if it is installed.")
     );
     constraintSettingsButton.onClick = function() { showConstraintSettings(); };

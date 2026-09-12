@@ -4031,37 +4031,62 @@ Duik.Constraint.writeTarget = function(layer, compName, layerName, only) {
 }
 
 /**
- * Lists what the copy location and copy rotation constraints of a layer currently
- * point at. The target can't be shown in the effect itself: an After Effects effect
- * has no parameter able to display a name, and effect parameters can't be renamed.
+ * Gets the active copy location or copy rotation constraint, the one the constraint
+ * settings work on: the last selected one. A selected parameter stands for its effect.
+ * @param {CompItem} [comp] - The composition. The active one if omitted.
+ * @return {PropertyGroup|null} The constraint effect, or <code>null</code> if no constraint is selected.
+ */
+Duik.Constraint.getActiveConstraint = function(comp) {
+    if (!isdef(comp)) comp = DuAEProject.getActiveComp();
+    if (!comp) return null;
+
+    var props = comp.selectedProperties;
+    for (var i = props.length - 1; i >= 0; i--) {
+        var effect = Duik.Constraint.copyConstraintEffect(props[i]);
+        if (effect) return effect;
+    }
+
+    return null;
+}
+
+/**
+ * Tells what a copy location or copy rotation constraint currently points at.
+ * The target can't be shown in the effect itself: an After Effects effect has no
+ * parameter able to display a name, and effect parameters can't be renamed.
+ * @param {PropertyBase|DuAEProperty} effect - The constraint effect, or any of its parameters.
+ * @return {Object|null} <code>{ effect, comp, layer }</code>: the names of the effect, of the
+ * composition and of the target layer. <code>comp</code> and <code>layer</code> are empty
+ * strings when no target has been set yet.<br />
+ * <code>null</code> if this isn't a copy location or copy rotation constraint.
+ */
+Duik.Constraint.getTarget = function(effect) {
+    effect = Duik.Constraint.copyConstraintEffect(effect);
+    if (!effect) return null;
+    var kind = Duik.Constraint.copyConstraintKind(effect);
+
+    var expression = effect.propertyGroup(2).transform.property(kind.property).expression;
+    var t = Duik.Constraint.bakedTargets(expression)[effect.name];
+    return {
+        effect: effect.name,
+        comp: t ? t[0] : '',
+        layer: t ? t[1] : ''
+    };
+}
+
+/**
+ * Lists what the copy location and copy rotation constraints of a layer currently point at.
  * @param {Layer} layer - The constrained layer.
  * @return {Object[]} One <code>{ effect, comp, layer }</code> per constraint, in the
- * order of the effects. <code>comp</code> and <code>layer</code> are empty strings
- * when no target has been set yet.
+ * order of the effects, as returned by {@link Duik.Constraint.getTarget}.
  */
 Duik.Constraint.getTargets = function(layer) {
     var result = [];
     if (!layer) return result;
 
-    var location = Duik.Constraint.bakedTargets(layer.position.expression);
-    var rotation = Duik.Constraint.bakedTargets(layer.rotation.expression);
-
     var effects = layer("ADBE Effect Parade");
     for (var i = 1, n = effects.numProperties; i <= n; i++) {
-        var effect = effects.property(i);
-        var targets = null;
-        if (effect.matchName.indexOf(Duik.PseudoEffect.COPY_LOCATION.matchName) == 0)
-            targets = location;
-        else if (effect.matchName.indexOf(Duik.PseudoEffect.COPY_ROTATION.matchName) == 0)
-            targets = rotation;
-        if (!targets) continue;
-
-        var t = targets[effect.name];
-        result.push({
-            effect: effect.name,
-            comp: t ? t[0] : '',
-            layer: t ? t[1] : ''
-        });
+        var t = Duik.Constraint.getTarget(effects.property(i));
+        if (t) result.push(t);
     }
 
     return result;
@@ -4272,6 +4297,9 @@ Duik.Constraint.copyLocation = function(comp, target, layers) {
 
     DuAEComp.selectLayers(layers);
 
+    // As in Blender, a new constraint becomes the active one, so its target can be set right away.
+    for (var i = 0, n = effects.length; i < n; i++) effects[i].selected = true;
+
     DuAE.endUndoGroup( i18n._("Copy Location"));
 
     return effects;
@@ -4464,6 +4492,9 @@ Duik.Constraint.copyRotation = function(comp, target, layers) {
 
     DuAEComp.selectLayers(layers);
 
+    // As in Blender, a new constraint becomes the active one, so its target can be set right away.
+    for (var i = 0, n = effects.length; i < n; i++) effects[i].selected = true;
+
     DuAE.endUndoGroup( i18n._("Copy Rotation"));
 
     return effects;
@@ -4553,6 +4584,27 @@ Duik.Constraint.applyConstraint = function(layer, name) {
     effect.remove();
 }
 
+/**
+ * Gets the copy location or copy rotation constraint effect a property belongs to.
+ * @private
+ * @param {PropertyBase|DuAEProperty} prop - The constraint effect, or any of its parameters.
+ * @return {PropertyGroup|null} The constraint effect, or <code>null</code> if the property isn't part of one.
+ */
+Duik.Constraint.copyConstraintEffect = function(prop) {
+    if (!prop) return null;
+    if (prop instanceof DuAEProperty) prop = prop.getProperty();
+    if (prop.propertyDepth < 2) return null;
+
+    // A selected parameter stands for its effect.
+    // Their match names start with the one of the effect, so this has to come first.
+    var effect = prop;
+    if (prop.propertyDepth > 2) effect = prop.propertyGroup(prop.propertyDepth - 2);
+    if (effect.parentProperty.matchName != 'ADBE Effect Parade') return null;
+    if (!Duik.Constraint.copyConstraintKind(effect)) return null;
+
+    return effect;
+}
+
 Duik.CmdLib['Constraint']["Apply Constraint"] = "Duik.Constraint.apply()";
 /**
  * Applies copy location and copy rotation constraints, the way Blender's <i>Apply</i> does:
@@ -4580,15 +4632,8 @@ Duik.Constraint.apply = function(effects) {
     var constraints = [];
     var found = {};
     for (var i = 0, n = effects.length(); i < n; i++) {
-        var prop = effects.at(i);
-        if (prop instanceof DuAEProperty) prop = prop.getProperty();
-        if (prop.propertyDepth < 2) continue;
-
-        // A selected parameter stands for its effect.
-        var effect = prop;
-        if (prop.propertyDepth > 2) effect = prop.propertyGroup(prop.propertyDepth - 2);
-        if (effect.parentProperty.matchName != 'ADBE Effect Parade') continue;
-        if (!Duik.Constraint.copyConstraintKind(effect)) continue;
+        var effect = Duik.Constraint.copyConstraintEffect(effects.at(i));
+        if (!effect) continue;
 
         var layer = effect.propertyGroup(2);
         var key = layer.containingComp.id + '/' + layer.index + '/' + effect.propertyIndex;

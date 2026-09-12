@@ -61,13 +61,13 @@ You can duplicate the effect to stack several copy location constraints on the s
 
 ### Choosing the target
 
-The target is set in the ***Constraint settings***, opened with the ![](../../img/duik/icons/settings.svg){style="width:1em;"} gear button in the toolbar at the top of the panel. Select the constrained layers, pick a **Target Composition** and a **Target Layer**, and click ***Set target***. The same panel shows what each constraint of the selection currently points at, so you can check a rig without opening the expressions.
+The target is set in the ***Constraint settings***, opened with the ![](../../img/duik/icons/settings.svg){style="width:1em;"} gear button in the toolbar at the top of the panel. As in Blender, the settings work on one constraint at a time, the *active* one. Select its effect in the *Effect Controls* panel or in the timeline (selecting one of its parameters works too): the settings show its name, its layer and what it currently points at, so you can check a rig without opening the expressions. When several constraint effects are selected, the last one is shown. Pick a **Target Composition** and a **Target Layer**, and click ***Set target*** to point that constraint at the layer; the other constraints keep their own targets.
 
-A newly created constraint has no target and does nothing until you set one.
+A newly created constraint has no target and does nothing until you set one. As in Blender, it becomes the active constraint when it's created, so opening the settings shows it right away.
 
 !!! tip
     The constraint settings can also live in their own panel, docked anywhere in the After Effects interface: click ![](../../img/duik/icons/dock.svg){style="width:1em;"} ***Pop out*** at the top of the settings, or `[Alt] + [Click]` the gear button. This launches the *Duik Constraint Settings* panel, which has to be [installed](../../getting-started/install.md) like the other Duik panels.  
-    After Effects doesn't tell scripts when the selection changes, so click ***Refresh*** to show the targets of the newly selected layers.
+    After Effects doesn't tell scripts when the selection changes, so click ***Refresh*** to show the newly selected constraint. Until then, ***Set target*** keeps working on the constraint shown.
 
 !!! note "Why the target isn't in the effect"
     Because After Effects can't put it there. No effect parameter type holds a name — the whole set is layer, slider, angle, checkbox, colour, point, drop down, group and button — and effect parameters can't be renamed, so a parameter can't display one either. A layer control would be no help: it only ever lists the layers of its own composition. A name can live in one place only, the expression, so that's where Duik writes it, in a `DUIK_TARGETS` line keyed by the name of the effect:
