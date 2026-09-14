@@ -64,8 +64,8 @@ function buildConstraintsUI(tab, standAlone) {
 
     var constraintSettingsButton = toolsGroup.addButton(
         i18n._("Constraint settings"),
-        DuScriptUI.Icon.SETTINGS,
-        i18n._("Set the target of the copy location and copy rotation constraints of the selected layers.") + "\n\n" +
+        w12_blender_icon_constraint,
+        i18n._("Set the target of the selected copy location, copy rotation or armature constraint.") + "\n\n" +
             i18n._("[Alt]: Launches the corresponding ScriptUI Stand-Alone panel if it is installed.")
     );
     constraintSettingsButton.onClick = function() { showConstraintSettings(); };
@@ -74,12 +74,13 @@ function buildConstraintsUI(tab, standAlone) {
     var applyConstraintButton = toolsGroup.addButton(
         i18n._("Apply Constraint"),
         w12_bake,
-        i18n._("Apply the selected copy location and copy rotation constraints, like in Blender: " +
-                "their result at the current time becomes the value of the layer, and the effects are removed.")
+        i18n._("Apply the selected constraints, like in Blender: " +
+                "their result at the current time becomes the value of the layer, and the effects are removed.\n\n" +
+                "Works with the position, copy location, orientation, copy rotation, path, parent and armature constraints.")
     );
     applyConstraintButton.onClick = function() {
         if (Duik.Constraint.apply() == 0)
-            alert(i18n._("Select the copy location or copy rotation effects to apply first."));
+            alert(i18n._("Select the constraint effects to apply first."));
     };
 
     var moveAnchorPointButton = createMoveAnchorPointButton(toolsGroup, mainGroup, hideAllGroups);
@@ -1471,30 +1472,12 @@ function buildConstraintsUI(tab, standAlone) {
         );
         positionConstraintButton.onClick = Duik.Constraint.position;
 
-        var copyLocationConstraintButton = this.addButton(
-            i18n._("Copy Location"),
-            w16_con_loclike,
-            i18n._("Replace the location of a layer with the location of another one.\n\n" +
-                    "An After Effects version of Blender's \"Copy Location\" constraint: " +
-                    "each axis can be copied, inverted or offset separately, in a choice of spaces.")
-        );
-        copyLocationConstraintButton.onClick = function() { Duik.Constraint.copyLocation(); };
-
         var orientationConstraintButton = this.addButton(
             i18n._("Orientation constraint"),
             w16_rotate,
             i18n._("Constraint the orientation of a layer to the orientation of other layers.")
         );
         orientationConstraintButton.onClick = Duik.Constraint.orientation;
-
-        var copyRotationConstraintButton = this.addButton(
-            i18n._("Copy Rotation"),
-            w16_con_rotlike,
-            i18n._("Combine the rotation of a layer with the rotation of another one.\n\n" +
-                    "An After Effects version of Blender's \"Copy Rotation\" constraint, " +
-                    "with its mix modes and spaces. Works on the rotation around the Z axis.")
-        );
-        copyRotationConstraintButton.onClick = function() { Duik.Constraint.copyRotation(); };
 
         var pathConstraintButton = this.addButton(
             i18n._("Path constraint") + '...',
@@ -1574,6 +1557,40 @@ function buildConstraintsUI(tab, standAlone) {
         };
     }
 
+    var customGroup = DuScriptUI.multiButton(
+        line2,
+        i18n._("Custom Constraints"),
+        w16_blender_icon_constraint,
+        i18n._("Create custom constraints, recreated from Blender (copy location, copy rotation, armature...).")
+    );
+    customGroup.build = function() {
+        var copyLocationConstraintButton = this.addButton(
+            i18n._("Copy Location"),
+            w16_blender_icon_con_loclike,
+            i18n._("Replace the location of a layer with the location of another one.\n\n" +
+                    "An After Effects version of Blender's \"Copy Location\" constraint: " +
+                    "each axis can be copied, inverted or offset separately, in a choice of spaces.")
+        );
+        copyLocationConstraintButton.onClick = function() { Duik.Constraint.copyLocation(); };
+
+        var copyRotationConstraintButton = this.addButton(
+            i18n._("Copy Rotation"),
+            w16_blender_icon_con_rotlike,
+            i18n._("Combine the rotation of a layer with the rotation of another one.\n\n" +
+                    "An After Effects version of Blender's \"Copy Rotation\" constraint, " +
+                    "with its mix modes and spaces. Works on the rotation around the Z axis.")
+        );
+        copyRotationConstraintButton.onClick = function() { Duik.Constraint.copyRotation(); };
+
+        var armatureConstraintButton = this.addButton(
+            i18n._("Armature"),
+            w16_blender_icon_con_armature,
+            i18n._("Make a layer follow everything a target layer does since its rest pose, like what's bound to a bone.\n\n" +
+                    "An After Effects version of Blender's \"Armature\" constraint, with a single target.")
+        );
+        armatureConstraintButton.onClick = function() { Duik.Constraint.armature(); };
+    }
+
     var parentAcrossCompGroup = DuScriptUI.group(mainGroup, 'column');
     parentAcrossCompGroup.visible = false;
     parentAcrossCompGroup.built = false;
@@ -1591,21 +1608,19 @@ function buildConstraintsUI(tab, standAlone) {
 
     function showConstraintSettings() {
         if (!constraintSettingsGroup.built) {
-            createSubPanel(
+            var titleBar = createSubPanel(
                 constraintSettingsGroup,
                 i18n._("Constraint settings"),
                 constraintsGroup
             );
 
-            var popOutButton = DuScriptUI.button(
-                constraintSettingsGroup,
-                i18n._("Pop out"),
-                w12_dock,
-                i18n._("Open the constraint settings in their own panel, which can be docked anywhere in the After Effects interface.")
-            );
+            // A native After Effects button, like the other buttons of the constraint settings.
+            var popOutButton = constraintSettingsGroup.add('button', undefined, i18n._("Pop out"));
+            popOutButton.helpTip = i18n._("Open the constraint settings in their own panel, which can be docked anywhere in the After Effects interface.");
+            popOutButton.alignment = ['fill', 'top'];
             popOutButton.onClick = openConstraintSettingsPanel;
 
-            constraintSettings = buildConstraintSettingsUI(constraintSettingsGroup);
+            constraintSettings = buildConstraintSettingsUI(constraintSettingsGroup, titleBar);
 
             DuScriptUI.showUI(constraintSettingsGroup);
         }

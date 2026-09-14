@@ -25,6 +25,7 @@ The top toolbar of the Links and Constraints panel contains a few useful tools r
 - [Kinematics (IK and FK)](kinematics.md)
 - [Parenting](parent.md)
 - [Transform Constraints](transform.md)
+- [Custom Constraints](custom.md)
 - Tools
     - [Add list](tools/list.md)
     - [Split values](tools/split.md)

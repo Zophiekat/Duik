@@ -75,6 +75,7 @@ nav:
             - Kinematics (IK and FK): guide/constraints/kinematics.md
             - Parent constraints: guide/constraints/parent.md
             - Transform constraints: guide/constraints/transform.md
+            - Custom constraints: guide/constraints/custom.md
             - Tools:
                 - List: guide/constraints/tools/list.md
                 - Split Values: guide/constraints/tools/split.md

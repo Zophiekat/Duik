@@ -62,6 +62,9 @@ The transformation of the child layer is computed depending on the weights and t
 !!! tip
     To improve performance, you can [bake the expressions](../automation/tools/bake.md)&nbsp;[^3] in the position and rotation properties of the child layer once you're done with the animation.
 
+!!! tip
+    You can also [apply](transform.md#applying-a-constraint) a parent constraint: its result at the current time becomes the position and rotation of the child layer, and the effect is removed.
+
 As this constraint relies on all previous movements to compute the current position and orientation of the child layer, changing any value at a specific time changes all the following values too. This is also true when moving keyframes in time. This may seem counter-intuitive, compared to the standard After Effects parenting, where you don't have to worry before changing a parent, because without parenting animation, After Effects can instantly adjust the values for all the times. That's not possible if what you need is precisely to animate this parenting like with the Duik Parent Constraint.
 
 To ease the animation of the parent constraint, it's better to always animate following the time of the composition, and try to never add, move or edit keyframes *before* existing keyframes.

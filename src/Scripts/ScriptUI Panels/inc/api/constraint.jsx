@@ -3947,6 +3947,16 @@ Duik.Constraint.bakedTargets = function(expression) {
 }
 
 /**
+ * Writes a string as a string literal, to use in an expression.
+ * @private
+ * @param {string} s The string.
+ * @return {string} The literal, quotes included.
+ */
+Duik.Constraint.expressionString = function(s) {
+    return '"' + DuString.replace(DuString.replace(s, '\\', '\\\\'), '"', '\\"') + '"';
+}
+
+/**
  * The expression resolving the target of a constraint from the name of its
  * composition and the name of the layer.<br />
  * An expression has no access to the project: it can't list its compositions, and
@@ -3960,9 +3970,7 @@ Duik.Constraint.bakedTargets = function(expression) {
 Duik.Constraint.targetExpression = function(targets) {
     targets = def(targets, {});
 
-    function quote(s) {
-        return '"' + DuString.replace(DuString.replace(s, '\\', '\\\\'), '"', '\\"') + '"';
-    }
+    var quote = Duik.Constraint.expressionString;
 
     var entries = [];
     for (var name in targets) {
@@ -3994,7 +4002,8 @@ Duik.Constraint.targetExpression = function(targets) {
 }
 
 /**
- * Writes the target of the copy location and copy rotation constraints of the layers.
+ * Writes the target of the constraints of a layer whose target is set in Duik: the copy location,
+ * copy rotation and armature constraints.
  * @private
  * @param {Layer} layer - The constrained layer.
  * @param {string} compName - The name of the composition holding the target.
@@ -4002,91 +4011,103 @@ Duik.Constraint.targetExpression = function(targets) {
  * @param {string[]} [only] - The names of the effects to retarget; all of them if omitted.
  */
 Duik.Constraint.writeTarget = function(layer, compName, layerName, only) {
-    var location = [];
-    var rotation = [];
+    // The names of the effects to retarget, by kind of constraint.
+    var kinds = {};
 
     var effects = layer("ADBE Effect Parade");
     for (var i = 1, n = effects.numProperties; i <= n; i++) {
         var effect = effects.property(i);
         if (isdef(only) && new DuList(only).indexOf(effect.name) < 0) continue;
-        if (effect.matchName.indexOf(Duik.PseudoEffect.COPY_LOCATION.matchName) == 0)
-            location.push(effect.name);
-        else if (effect.matchName.indexOf(Duik.PseudoEffect.COPY_ROTATION.matchName) == 0)
-            rotation.push(effect.name);
+        var kind = Duik.Constraint.constraintKind(effect);
+        if (!kind || !kind.expression) continue;
+        if (!kinds[kind.matchName]) kinds[kind.matchName] = { kind: kind, names: [] };
+        kinds[kind.matchName].names.push(effect.name);
     }
 
-    if (location.length > 0) {
-        var targets = Duik.Constraint.bakedTargets(layer.position.expression);
-        for (var i = 0, n = location.length; i < n; i++)
-            targets[location[i]] = [compName, layerName];
-        layer.position.expression = Duik.Constraint.copyLocationExpression(targets);
-    }
-
-    if (rotation.length > 0) {
-        var targets = Duik.Constraint.bakedTargets(layer.rotation.expression);
-        for (var i = 0, n = rotation.length; i < n; i++)
-            targets[rotation[i]] = [compName, layerName];
-        layer.rotation.expression = Duik.Constraint.copyRotationExpression(targets);
+    for (var matchName in kinds) {
+        var kind = kinds[matchName].kind;
+        var names = kinds[matchName].names;
+        // Each property driven by the constraint holds the targets in its own expression.
+        for (var i = 0, n = kind.properties.length; i < n; i++) {
+            var prop = layer.transform.property(kind.properties[i]);
+            if (!prop) continue;
+            var targets = Duik.Constraint.bakedTargets(prop.expression);
+            for (var j = 0, m = names.length; j < m; j++)
+                targets[names[j]] = [compName, layerName];
+            prop.expression = kind.expression(targets, kind.properties[i]);
+        }
     }
 }
 
 /**
- * Lists what the copy location and copy rotation constraints of a layer currently
- * point at. The target can't be shown in the effect itself: an After Effects effect
- * has no parameter able to display a name, and effect parameters can't be renamed.
- * @param {Layer} layer - The constrained layer.
- * @return {Object[]} One <code>{ effect, comp, layer }</code> per constraint, in the
- * order of the effects. <code>comp</code> and <code>layer</code> are empty strings
- * when no target has been set yet.
+ * Tells what a copy location, copy rotation or armature constraint currently points at. The target
+ * can't be shown in the effect itself: an After Effects effect has no parameter able to
+ * display a name, and effect parameters can't be renamed.
+ * @param {PropertyBase|DuAEProperty} [effect] - The constraint effect, or any of its parameters.
+ * The selected one in the active composition if omitted.
+ * @return {Object|null} <code>{ effect, comp, layer, restPose }</code>: the name of the effect, the names
+ * of the composition and the layer it points at, which are empty strings when no target has been
+ * set yet, and whether the constraint has a rest pose, set with {@link Duik.Constraint.setRestPose}.<br />
+ * <code>null</code> if there's no constraint.
  */
-Duik.Constraint.getTargets = function(layer) {
-    var result = [];
-    if (!layer) return result;
+Duik.Constraint.getTarget = function(effect) {
+    var constraint = Duik.Constraint.getTargetConstraints(effect)[0];
+    if (!constraint) return null;
 
-    var location = Duik.Constraint.bakedTargets(layer.position.expression);
-    var rotation = Duik.Constraint.bakedTargets(layer.rotation.expression);
+    var prop = constraint.layer.transform.property(constraint.kind.properties[0]);
+    var t = Duik.Constraint.bakedTargets(prop.expression)[constraint.name];
+    return {
+        effect: constraint.name,
+        comp: t ? t[0] : '',
+        layer: t ? t[1] : '',
+        restPose: constraint.kind.restPose
+    };
+}
 
-    var effects = layer("ADBE Effect Parade");
-    for (var i = 1, n = effects.numProperties; i <= n; i++) {
-        var effect = effects.property(i);
-        var targets = null;
-        if (effect.matchName.indexOf(Duik.PseudoEffect.COPY_LOCATION.matchName) == 0)
-            targets = location;
-        else if (effect.matchName.indexOf(Duik.PseudoEffect.COPY_ROTATION.matchName) == 0)
-            targets = rotation;
-        if (!targets) continue;
+/**
+ * Runs a function which changes the selection, and puts the selection back as it was:
+ * writing an expression or adding a layer changes the selection in After Effects.
+ * @private
+ * @param {CompItem} comp - The composition.
+ * @param {Function} callback - The function.
+ * @return {*} What the function returns.
+ */
+Duik.Constraint.keepSelection = function(comp, callback) {
+    var selectedLayers = comp.selectedLayers;
+    var selectedProps = comp.selectedProperties;
 
-        var t = targets[effect.name];
-        result.push({
-            effect: effect.name,
-            comp: t ? t[0] : '',
-            layer: t ? t[1] : ''
-        });
-    }
+    var result = callback();
+
+    DuAEComp.unselectLayers(comp);
+    DuAEComp.selectLayers(selectedLayers);
+    for (var i = 0, n = selectedProps.length; i < n; i++) selectedProps[i].selected = true;
 
     return result;
 }
 
 Duik.CmdLib['Constraint']["Set constraint target"] = "Duik.Constraint.setTarget()";
 /**
- * Points every copy location and copy rotation constraint of the layers at a layer,
- * which can live in any composition of the project.<br />
+ * Points a copy location, copy rotation or armature constraint at a layer, which can live in any
+ * composition of the project. The other constraints of its layer keep their target.<br />
+ * An armature constraint takes the current pose of its new target as its rest pose, so that its
+ * layer doesn't move: see {@link Duik.Constraint.setRestPose}.<br />
  * The target is looked up by name, so run this again after renaming the composition
  * or the target layer.
  * @param {CompItem} comp - The composition holding the target.
  * @param {Layer} target - The target layer.
- * @param {Layer|Layer[]|DuList.<Layer>} [layers] - The constrained layers.
+ * @param {PropertyBase|DuAEProperty} [effect] - The constraint effect, or any of its parameters.
+ * The selected one in the active composition if omitted.
  */
-Duik.Constraint.setTarget = function(comp, target, layers) {
+Duik.Constraint.setTarget = function(comp, target, effect) {
     if (!comp || !target) return;
-    layers = def(layers, DuAEComp.getSelectedLayers());
-    layers = new DuList(layers);
-    if (layers.length() == 0) return;
+    var constraint = Duik.Constraint.getTargetConstraints(effect)[0];
+    if (!constraint) return;
 
     DuAE.beginUndoGroup( i18n._("Set constraint target"), false);
 
-    layers.do(function(layer) {
-        Duik.Constraint.writeTarget(layer, comp.name, target.name);
+    Duik.Constraint.keepSelection(constraint.layer.containingComp, function() {
+        Duik.Constraint.writeTarget(constraint.layer, comp.name, target.name, [constraint.name]);
+        if (constraint.kind.restPose) Duik.Constraint.captureRestPose(constraint);
     });
 
     DuAE.endUndoGroup( i18n._("Set constraint target"));
@@ -4470,36 +4491,481 @@ Duik.Constraint.copyRotation = function(comp, target, layers) {
 }
 
 /**
- * Tells what a copy location or copy rotation constraint effect drives.
+ * The functions the expressions of the armature constraint are made of. They also read the
+ * rest pose, so that the constraint doesn't move its layer while its target is in that pose.
+ * @private
+ * @return {string} The functions.
+ */
+Duik.Constraint.armatureFunctions = function() {
+    return [
+        '// The rotation of a layer around Z, relative to its parent.',
+        '// The orientation of 3D layers is a part of it.',
+        'function localRotation(l) {',
+        '    var r = l.rotation.value;',
+        '    if (l.anchorPoint.value.length == 3) r += l.orientation.value[2];',
+        '    return r;',
+        '}',
+        '',
+        '// A negatively scaled parent mirrors the rotation of its children,',
+        '// and a vertical flip turns them upside down.',
+        'function scaleMirror(l) {',
+        '    var m = 1;',
+        '    while (l.hasParent) {',
+        '        l = l.parent;',
+        '        var s = l.scale.value;',
+        '        m *= Math.sign(s[0] * s[1]);',
+        '    }',
+        '    return m;',
+        '}',
+        'function scaleUTurn(l) {',
+        '    var u = 1;',
+        '    while (l.hasParent) {',
+        '        l = l.parent;',
+        '        u = u * l.scale.value[1];',
+        '    }',
+        '    if (u < 0) return 180;',
+        '    return 0;',
+        '}',
+        '',
+        '// The rotation the parents of a layer add to its own.',
+        'function parentsRotation(l) {',
+        '    var r = 0;',
+        '    while (l.hasParent) {',
+        '        l = l.parent;',
+        '        var lr = localRotation(l);',
+        '        if (l.hasParent) {',
+        '            var s = l.parent.scale.value;',
+        '            lr *= Math.sign(s[0] * s[1]);',
+        '        }',
+        '        r += lr;',
+        '    }',
+        '    return r;',
+        '}',
+        '',
+        '// The rotation of a layer in the space of its own comp, every parent applied.',
+        'function worldRotation(l) {',
+        '    return localRotation(l) * scaleMirror(l) + scaleUTurn(l) + parentsRotation(l);',
+        '}',
+        '',
+        '// Comp space -> the space the rotation of a layer is expressed in. It only reads the',
+        '// parents of the layer, so that the position and scale of the layer can use it too.',
+        'function toLocalRotation(l, r) {',
+        '    return (r - scaleUTurn(l) - parentsRotation(l)) * scaleMirror(l);',
+        '}',
+        '',
+        '// Comp space -> the space the position of a layer is expressed in.',
+        '// A layer without a parent is already in comp space.',
+        'function toParentSpace(l, p) {',
+        '    if (!l.hasParent) return p;',
+        '    return l.parent.fromWorld(p);',
+        '}',
+        '',
+        'function offsetPoint(p, x, y) {',
+        '    var q = [ p[0] + x, p[1] + y ];',
+        '    if (p.length > 2) q.push(p[2]);',
+        '    return q;',
+        '}',
+        '',
+        '// The pose of a bone, in the space the position of a layer is expressed in: the location',
+        '// of its anchor point, and the vectors one pixel along its X and Y axis become, holding its',
+        '// rotation, scale and skew. They are measured over a hundred pixels, for precision.',
+        'function bonePose(l, bone) {',
+        '    var a = bone.anchorPoint.value;',
+        '    var o = toParentSpace(l, bone.toWorld(a));',
+        '    var x = toParentSpace(l, bone.toWorld(offsetPoint(a, 100, 0)));',
+        '    var y = toParentSpace(l, bone.toWorld(offsetPoint(a, 0, 100)));',
+        '    return {',
+        '        location: [ o[0], o[1], o.length > 2 ? o[2] : 0 ],',
+        '        x: [ (x[0] - o[0]) / 100, (x[1] - o[1]) / 100 ],',
+        '        y: [ (y[0] - o[0]) / 100, (y[1] - o[1]) / 100 ]',
+        '    };',
+        '}'
+    ].join('\n');
+}
+
+/**
+ * Builds the expressions of the armature constraint: one for each of the properties it drives.
+ * @private
+ * @param {Object} [targets] The targets, as <code>{ effectName: [compName, layerName] }</code>.
+ * @param {string} [property='ADBE Position'] The match name of the property: <code>'ADBE Position'</code>,
+ * <code>'ADBE Rotate Z'</code> or <code>'ADBE Scale'</code>.
+ * @return {string} The expression.
+ */
+Duik.Constraint.armatureExpression = function(targets, property) {
+    property = def(property, 'ADBE Position');
+    var p = Duik.PseudoEffect.ARMATURE.props;
+    var rest = p['DUIK Data'];
+
+    function param(name) {
+        return 'fx(' + rest[name].index + ').value';
+    }
+
+    var main;
+    if (property == 'ADBE Rotate Z') main = [
+        'var orientation = 0;',
+        'if (thisLayer.anchorPoint.value.length == 3) orientation = thisLayer.orientation.value[2];',
+        '',
+        '// This layer turns as much as its X axis does.',
+        'var constraints = armatureConstraints(true);',
+        'var result = value;',
+        'for (var i = 0, n = constraints.length; i < n; i++) {',
+        '    var c = constraints[i];',
+        '    result += turnOf(c.transform, result + orientation, c.turns) * c.influence;',
+        '}',
+        'result;'
+    ];
+    else if (property == 'ADBE Scale') main = [
+        'var orientation = 0;',
+        'if (thisLayer.anchorPoint.value.length == 3) orientation = thisLayer.orientation.value[2];',
+        '',
+        'var constraints = armatureConstraints(true);',
+        '',
+        '// How much the scale changes depends on the rotation of this layer before the',
+        '// constraints, but its rotation holds the one after them: take their turns out.',
+        '// That is exact, unless a bone is scaled unevenly.',
+        'var rotation = thisLayer.rotation.value + orientation;',
+        'for (var i = 0, n = constraints.length; i < n; i++)',
+        '    rotation -= constraints[i].turns * constraints[i].influence;',
+        '',
+        'var result = copyOf(value);',
+        'for (var i = 0, n = constraints.length; i < n; i++) {',
+        '    var c = constraints[i];',
+        '    var scaled = scaleOf(c.transform, rotation, result);',
+        '    result[0] += (scaled[0] - result[0]) * c.influence;',
+        '    result[1] += (scaled[1] - result[1]) * c.influence;',
+        '    rotation += turnOf(c.transform, rotation, c.turns) * c.influence;',
+        '}',
+        'result;'
+    ];
+    else main = [
+        'var constraints = armatureConstraints(false);',
+        'var result = copyOf(value);',
+        'for (var i = 0, n = constraints.length; i < n; i++) {',
+        '    var c = constraints[i];',
+        '    var moved = transformPoint(c.transform, result);',
+        '    for (var k = 0; k < result.length; k++) result[k] += (moved[k] - result[k]) * c.influence;',
+        '}',
+        'result;'
+    ];
+
+    return [DuAEExpression.Id.ARMATURE_CONSTRAINT,
+        DuAEExpression.Library.get(['checkDuikEffect', 'sign']),
+        Duik.Constraint.targetExpression(targets),
+        '',
+        Duik.Constraint.armatureFunctions(),
+        '',
+        '// The pose of the target in which the constraint does nothing,',
+        '// taken by Duik and stored in the effect.',
+        'function restPose(fx) {',
+        '    return {',
+        '        location: [ ' + param('Rest location X') + ', ' + param('Rest location Y') + ', ' + param('Rest location Z') + ' ],',
+        '        x: [ ' + param('Rest X axis X') + ', ' + param('Rest X axis Y') + ' ],',
+        '        y: [ ' + param('Rest Y axis X') + ', ' + param('Rest Y axis Y') + ' ],',
+        '        rotation: ' + param('Rest rotation'),
+        '    };',
+        '}',
+        '',
+        '// The transformation taking a bone from its rest pose to its current pose: the pose',
+        '// times the inverse of the rest pose, like the deformation matrix of a Blender bone.',
+        '// null when the rest pose is flat, as it is before being set.',
+        'function restToPose(rest, pose) {',
+        '    var det = rest.x[0] * rest.y[1] - rest.y[0] * rest.x[1];',
+        '    if (Math.abs(det) < 1e-9) return null;',
+        '    var ia = rest.y[1] / det;',
+        '    var ib = -rest.x[1] / det;',
+        '    var ic = -rest.y[0] / det;',
+        '    var id = rest.x[0] / det;',
+        '    return {',
+        '        a: pose.x[0] * ia + pose.y[0] * ib,',
+        '        b: pose.x[1] * ia + pose.y[1] * ib,',
+        '        c: pose.x[0] * ic + pose.y[0] * id,',
+        '        d: pose.x[1] * ic + pose.y[1] * id,',
+        '        from: rest.location,',
+        '        to: pose.location',
+        '    };',
+        '}',
+        '',
+        '// Moves a point with the bone. The depth only follows the bone.',
+        'function transformPoint(m, p) {',
+        '    var x = p[0] - m.from[0];',
+        '    var y = p[1] - m.from[1];',
+        '    var q = [ m.a * x + m.c * y + m.to[0], m.b * x + m.d * y + m.to[1] ];',
+        '    if (p.length > 2) q.push(p[2] + m.to[2] - m.from[2]);',
+        '    return q;',
+        '}',
+        '',
+        '// The vector the X axis of a layer turned by r degrees becomes.',
+        'function axisOf(m, r) {',
+        '    var a = degreesToRadians(r);',
+        '    return [ m.a * Math.cos(a) + m.c * Math.sin(a), m.b * Math.cos(a) + m.d * Math.sin(a) ];',
+        '}',
+        '',
+        '// How many degrees a layer turned by r degrees turns: as much as its X axis, with',
+        '// as many full turns as the bone made since its rest pose.',
+        'function turnOf(m, r, turns) {',
+        '    var v = axisOf(m, r);',
+        '    var angle = radiansToDegrees(Math.atan2(v[1], v[0])) - r - turns;',
+        '    return turns + angle - 360 * Math.round(angle / 360);',
+        '}',
+        '',
+        '// The scale of a layer turned by r degrees, once transformed: stretched as much as its',
+        '// X axis, with its area scaled as much as any area. A layer can\'t show the skew.',
+        'function scaleOf(m, r, s) {',
+        '    var v = axisOf(m, r);',
+        '    var k = Math.sqrt(v[0] * v[0] + v[1] * v[1]);',
+        '    if (k == 0) return s;',
+        '    var q = [ s[0] * k, s[1] * (m.a * m.d - m.b * m.c) / k ];',
+        '    if (s.length > 2) q.push(s[2]);',
+        '    return q;',
+        '}',
+        '',
+        'function copyOf(v) {',
+        '    var c = [];',
+        '    for (var i = 0; i < v.length; i++) c.push(v[i]);',
+        '    return c;',
+        '}',
+        '',
+        '// The armature constraints of this layer, from top to bottom: the transformation of their',
+        '// bone since the rest pose, how many degrees the bone turned, and the influence.',
+        'function armatureConstraints(withTurns) {',
+        '    var list = [];',
+        '    for ( var i = 1, n = thisLayer("Effects").numProperties; i <= n; i++ ) {',
+        '        var fx = thisLayer.effect(i);',
+        '        if ( !checkDuikEffect(fx, "DUIK armature") ) continue;',
+        '        if ( !fx.active ) continue;',
+        '',
+        '        var t = targetOf(fx);',
+        '        if (!t) continue;',
+        '',
+        '        // Blender divides the transformation by the total weight of the targets: with a',
+        '        // single target, any weight applies all of it. Its dual quaternion blending, when',
+        '        // "Preserve Volume" is checked, gives back that same transformation too.',
+        '        if (fx(' + p['Weight'].index + ').value <= 0) continue;',
+        '',
+        '        var rest = restPose(fx);',
+        '        var m = restToPose(rest, bonePose(thisLayer, t.layer));',
+        '        if (!m) continue;',
+        '',
+        '        var turns = 0;',
+        '        if (withTurns) turns = toLocalRotation(thisLayer, worldRotation(t.layer)) - rest.rotation;',
+        '',
+        '        // Blended with the influence, like Blender does, so that several',
+        '        // of these effects can be stacked on the same layer.',
+        '        list.push({ transform: m, turns: turns, influence: fx(' + p['Influence'].index + ').value / 100 });',
+        '    }',
+        '    return list;',
+        '}',
+        '',
+        main.join('\n'),
+        ''
+    ].join('\n');
+}
+
+Duik.CmdLib['Constraint']["Armature"] = "Duik.Constraint.armature()";
+/**
+ * Adds an <i>armature</i> constraint to the layers.<br />
+ * This is an After Effects recreation of Blender's <i>Armature</i> constraint, with a single target:
+ * everything the target layer did since its rest pose, moving, turning and scaling, is done to the
+ * layer too, the way an armature moves what's bound to its bones.<br />
+ * The rest pose is the pose of the target in which the constraint doesn't move the layer. It's taken
+ * when the target is set, and stored relative to the parent of the layer, which plays the part of
+ * Blender's armature object; see {@link Duik.Constraint.setRestPose}.<br />
+ * The target is a layer of any composition of the project, picked in the Duik panel
+ * and looked up by name; it can be changed later with {@link Duik.Constraint.setTarget}.<br />
+ * Several of these effects can be added on the same layer; they're evaluated in
+ * order, the same way Blender stacks constraints.<br />
+ * The constraint is computed live by expressions on the position, rotation and scale of the layer,
+ * and never needs a keyframe.
+ * @param {CompItem} comp - The composition holding the target.
+ * @param {Layer} target - The target layer.
+ * @param {Layer|Layer[]|DuList.<Layer>} [layers] - The constrained layers.
+ * @return {Property[]} The effects added on the layers to control the constraint.
+ */
+Duik.Constraint.armature = function(comp, target, layers) {
+    layers = def(layers, DuAEComp.unselectLayers());
+    layers = new DuList(layers);
+
+    DuAE.beginUndoGroup( i18n._("Armature"), false);
+
+    var pe = Duik.PseudoEffect.ARMATURE;
+    var effects = [];
+
+    layers.do(function(layer) {
+        // The name of the effect is the key of its target, so it has to be unique.
+        var name = Duik.Constraint.uniqueEffectName(layer, pe.name);
+        var effect = pe.apply(layer, name);
+        effects.push(effect);
+
+        var kind = Duik.Constraint.constraintKind(effect);
+        for (var i = 0, n = kind.properties.length; i < n; i++) {
+            var prop = layer.transform.property(kind.properties[i]);
+            if (!prop) continue;
+            var targets = Duik.Constraint.bakedTargets(prop.expression);
+            if (comp && target) targets[name] = [comp.name, target.name];
+            prop.expression = Duik.Constraint.armatureExpression(targets, kind.properties[i]);
+        }
+
+        if (comp && target) Duik.Constraint.captureRestPose({ layer: layer, name: name, kind: kind });
+    });
+
+    DuAEComp.selectLayers(layers);
+
+    DuAE.endUndoGroup( i18n._("Armature"));
+
+    return effects;
+}
+
+/**
+ * Takes the current pose of the target of an armature constraint as its rest pose.
+ * @private
+ * @param {Object} constraint - The constraint, as returned by {@link Duik.Constraint.getConstraints}.
+ * @return {Boolean} false if the constraint has no target.
+ */
+Duik.Constraint.captureRestPose = function(constraint) {
+    var layer = constraint.layer;
+    var prop = layer.transform.property(constraint.kind.properties[0]);
+    var t = Duik.Constraint.bakedTargets(prop.expression)[constraint.name];
+    if (!t) return false;
+
+    var comp = layer.containingComp;
+    var time = comp.time;
+    var quote = Duik.Constraint.expressionString;
+
+    // Scripts can't tell where a layer is, expressions can: a temporary null layer reads the pose,
+    // with the very functions the constraint is built with, so that they match exactly.
+    var probe = comp.layers.addNull();
+    probe.threeDLayer = true;
+    var pose = [DuAEExpression.Library.get(['sign']),
+        Duik.Constraint.armatureFunctions(),
+        'var owner = thisComp.layer(' + layer.index + ');',
+        'var bone = comp(' + quote(t[0]) + ').layer(' + quote(t[1]) + ');',
+        'var pose = bonePose(owner, bone);',
+        ''
+    ].join('\n');
+
+    var transform = probe.transform;
+    transform.position.expression = pose + 'var result = pose.location;\nresult;';
+    transform.anchorPoint.expression = pose +
+        'var result = [ pose.x[0], pose.x[1], toLocalRotation(owner, worldRotation(bone)) ];\nresult;';
+    transform.scale.expression = pose + 'var result = [ pose.y[0], pose.y[1], 0 ];\nresult;';
+    var location = transform.position.valueAtTime(time, false);
+    var x = transform.anchorPoint.valueAtTime(time, false);
+    var y = transform.scale.valueAtTime(time, false);
+
+    var source = probe.source;
+    probe.remove();
+    source.remove();
+
+    var rest = Duik.PseudoEffect.ARMATURE.props['DUIK Data'];
+    var effect = layer("ADBE Effect Parade").property(constraint.name);
+    effect(rest['Rest location X'].index).setValue(location[0]);
+    effect(rest['Rest location Y'].index).setValue(location[1]);
+    effect(rest['Rest location Z'].index).setValue(location[2]);
+    effect(rest['Rest X axis X'].index).setValue(x[0]);
+    effect(rest['Rest X axis Y'].index).setValue(x[1]);
+    effect(rest['Rest rotation'].index).setValue(x[2]);
+    effect(rest['Rest Y axis X'].index).setValue(y[0]);
+    effect(rest['Rest Y axis Y'].index).setValue(y[1]);
+
+    return true;
+}
+
+Duik.CmdLib['Constraint']["Set rest pose"] = "Duik.Constraint.setRestPose()";
+/**
+ * Takes the current pose of the target of an armature constraint as its rest pose: the pose in which
+ * the constraint doesn't move the layer, which goes back to its own transformation.<br />
+ * Duik takes it when the target is set. Take it again to bind the layer to another pose of the target,
+ * like editing the rest pose of a Blender armature, or after re-parenting the layer.
+ * @param {PropertyBase|DuAEProperty} [effect] - The constraint effect, or any of its parameters.
+ * The selected one in the active composition if omitted.
+ * @return {Boolean} true if the rest pose has been set; false if there's no armature constraint with a target.
+ */
+Duik.Constraint.setRestPose = function(effect) {
+    var constraint = Duik.Constraint.getTargetConstraints(effect)[0];
+    if (!constraint || !constraint.kind.restPose) return false;
+
+    DuAE.beginUndoGroup( i18n._("Set rest pose"), false);
+
+    var done = Duik.Constraint.keepSelection(constraint.layer.containingComp, function() {
+        return Duik.Constraint.captureRestPose(constraint);
+    });
+
+    DuAE.endUndoGroup( i18n._("Set rest pose"));
+
+    return done;
+}
+
+/**
+ * Tells what a constraint effect drives, and how to apply it.
  * @private
  * @param {PropertyGroup} effect The effect.
- * @return {Object|null} <code>{ matchName, property, id, expression }</code>: the match name
- * of the effect, the match name of the transform property driven by the constraint, the id of
- * its expression, and the function building that expression.<br />
- * <code>null</code> if the effect isn't one of these constraints.
+ * @return {Object|null} <code>{ matchName, properties, id, expression, named, restPose }</code>: the
+ * match name of the effect, the match names of the transform properties its expressions can drive, and
+ * the id of these expressions.<br />
+ * <code>expression</code> is the function building the expressions of a constraint whose target is set
+ * in Duik — copy location, copy rotation or armature — from its targets and the match name of the
+ * property, <code>null</code> for the other constraints.<br />
+ * <code>named</code> is true when the expressions read the effect by its name, instead of going
+ * through all the effects of its kind.<br />
+ * <code>restPose</code> is true when the constraint has a rest pose, set by {@link Duik.Constraint.setRestPose}.<br />
+ * <code>null</code> if the effect isn't a constraint which can be applied.
  */
-Duik.Constraint.copyConstraintKind = function(effect) {
-    var location = Duik.PseudoEffect.COPY_LOCATION.matchName;
-    if (effect.matchName.indexOf(location) == 0) return {
-        matchName: location,
-        property: 'ADBE Position',
+Duik.Constraint.constraintKind = function(effect) {
+    var kinds = [{
+        pe: Duik.PseudoEffect.COPY_LOCATION,
+        properties: ['ADBE Position'],
         id: DuAEExpression.Id.COPY_LOCATION_CONSTRAINT,
         expression: Duik.Constraint.copyLocationExpression
-    };
-
-    var rotation = Duik.PseudoEffect.COPY_ROTATION.matchName;
-    if (effect.matchName.indexOf(rotation) == 0) return {
-        matchName: rotation,
-        property: 'ADBE Rotate Z',
+    }, {
+        pe: Duik.PseudoEffect.COPY_ROTATION,
+        properties: ['ADBE Rotate Z'],
         id: DuAEExpression.Id.COPY_ROTATION_CONSTRAINT,
         expression: Duik.Constraint.copyRotationExpression
-    };
+    }, {
+        pe: Duik.PseudoEffect.ARMATURE,
+        properties: ['ADBE Position', 'ADBE Rotate Z', 'ADBE Scale'],
+        id: DuAEExpression.Id.ARMATURE_CONSTRAINT,
+        expression: Duik.Constraint.armatureExpression,
+        restPose: true
+    }, {
+        pe: Duik.PseudoEffect.POSITION,
+        properties: ['ADBE Position'],
+        id: DuAEExpression.Id.POSITION_CONSTRAINT
+    }, {
+        pe: Duik.PseudoEffect.ORIENTATION,
+        properties: ['ADBE Rotate Z'],
+        id: DuAEExpression.Id.ORIENTATION_CONSTRAINT
+    }, {
+        // Each dimension gets the expression when the position is separated.
+        pe: Duik.PseudoEffect.PARENT,
+        properties: ['ADBE Position', 'ADBE Position_0', 'ADBE Position_1', 'ADBE Position_2', 'ADBE Rotate Z'],
+        id: DuAEExpression.Id.PARENT_CONSTRAINT
+    }, {
+        // Only the last path constraint added to a layer drives it: its expressions read it by name.
+        pe: Duik.PseudoEffect.PATH,
+        properties: ['ADBE Position', 'ADBE Rotate Z'],
+        id: DuAEExpression.Id.PATH_CONSTRAINT,
+        named: true
+    }];
+
+    for (var i = 0, n = kinds.length; i < n; i++) {
+        var kind = kinds[i];
+        if (effect.matchName.indexOf(kind.pe.matchName) != 0) continue;
+        return {
+            matchName: kind.pe.matchName,
+            properties: kind.properties,
+            id: kind.id,
+            expression: def(kind.expression, null),
+            named: def(kind.named, false),
+            restPose: def(kind.restPose, false)
+        };
+    }
 
     return null;
 }
 
 /**
- * Applies a single copy location or copy rotation constraint.
+ * Applies a single constraint.
  * @private
  * @param {Layer} layer - The constrained layer.
  * @param {string} name - The name of the constraint effect.
@@ -4508,79 +4974,123 @@ Duik.Constraint.applyConstraint = function(layer, name) {
     var effects = layer("ADBE Effect Parade");
     var effect = effects.property(name);
     if (!effect) return;
-    var kind = Duik.Constraint.copyConstraintKind(effect);
+    var kind = Duik.Constraint.constraintKind(effect);
     if (!kind) return;
 
-    var prop = layer.transform.property(kind.property);
     var time = layer.containingComp.time;
 
-    // Only the expression written by Duik can be rebuilt: any other one is left alone.
-    // When it's disabled, the constraint doesn't drive anything.
-    var ours = prop.expression.indexOf(kind.id) >= 0;
-    var enabled = prop.expressionEnabled;
-    var targets = Duik.Constraint.bakedTargets(prop.expression);
+    // The expressions are still needed as long as other constraints of this kind remain,
+    // unless they read this effect by its name.
+    var count = 0;
+    for (var i = 1, n = effects.numProperties; i <= n; i++) {
+        if (effects.property(i).matchName.indexOf(kind.matchName) == 0) count++;
+    }
+    var keep = count > 1 && !kind.named;
 
-    var value = null;
-    if (ours && enabled) {
-        // Like Blender, evaluate this constraint alone, on the unconstrained value:
-        // the other constraints have no target in this expression, so they're skipped.
-        var only = {};
-        only[name] = targets[name];
-        prop.expression = kind.expression(only);
-        value = prop.valueAtTime(time, false);
+    // Only the expressions written by Duik can be rebuilt: any other one is left alone.
+    // When one is disabled, the constraint doesn't drive its property.
+    var driven = [];
+    for (var i = 0, n = kind.properties.length; i < n; i++) {
+        var prop = layer.transform.property(kind.properties[i]);
+        if (!prop) continue;
+        // Separating the dimensions hides the position, and the other way round.
+        if (prop.isSeparationLeader && prop.dimensionsSeparated) continue;
+        if (prop.isSeparationFollower && !prop.separationLeader.dimensionsSeparated) continue;
+
+        var expression = prop.expression;
+        if (expression.indexOf(kind.id) < 0) continue;
+        if (kind.named && expression.indexOf('effect("' + name + '")') < 0) continue;
+        driven.push({
+            property: kind.properties[i],
+            prop: prop,
+            expression: expression,
+            enabled: prop.expressionEnabled,
+            value: null
+        });
     }
 
-    if (ours) {
-        // The expression is still needed as long as other constraints of this kind remain.
-        var count = 0;
-        for (var i = 1, n = effects.numProperties; i <= n; i++) {
-            if (effects.property(i).matchName.indexOf(kind.matchName) == 0) count++;
+    // Like Blender, evaluate this constraint alone, on the unconstrained value: the other constraints
+    // have no target in these expressions, so they're skipped. The expressions of a constraint can
+    // read each other, so they're all set before any value is read.
+    if (kind.expression) {
+        for (var i = 0, n = driven.length; i < n; i++) {
+            var d = driven[i];
+            if (!d.enabled) continue;
+            var only = {};
+            only[name] = Duik.Constraint.bakedTargets(d.expression)[name];
+            d.prop.expression = kind.expression(only, d.property);
         }
-
-        delete targets[name];
-        if (count > 1) {
-            prop.expression = kind.expression(targets);
-            prop.expressionEnabled = enabled;
-        }
-        else prop.expression = '';
+    }
+    for (var i = 0, n = driven.length; i < n; i++) {
+        if (driven[i].enabled) driven[i].value = driven[i].prop.valueAtTime(time, false);
     }
 
-    // Don't add a keyframe to an animated property if the constraint changed nothing.
-    if (value !== null && !DuMath.equals(value, prop.valueAtTime(time, true), 4))
-        new DuAEProperty(prop).setValue(value, time);
+    for (var i = 0, n = driven.length; i < n; i++) {
+        var d = driven[i];
+        if (kind.expression) {
+            var targets = Duik.Constraint.bakedTargets(d.expression);
+            delete targets[name];
+            if (keep) {
+                d.prop.expression = kind.expression(targets, d.property);
+                d.prop.expressionEnabled = d.enabled;
+            }
+            else d.prop.expression = '';
+        }
+        // The other expressions go through the effects by themselves: there's nothing to rebuild.
+        else if (!keep) d.prop.expression = '';
+    }
 
-    // Removed last: removing an effect invalidates the references to the other ones.
+    // Removed before setting the values, so that the expressions left in place don't read it anymore.
     effect.remove();
+
+    for (var i = 0, n = driven.length; i < n; i++) {
+        var value = driven[i].value;
+        if (value === null) continue;
+        // Removing an effect can invalidate the references to the properties of the layer.
+        var prop = layer.transform.property(driven[i].property);
+        var current = prop.valueAtTime(time, true);
+
+        // The position, orientation and parent constraints left on the layer each add their own
+        // share on top of its value, whatever it is: take it out, so that the layer stays where it is.
+        if (keep && !kind.expression) {
+            var remaining = prop.valueAtTime(time, false);
+            if (value instanceof Array) {
+                for (var j = 0, m = value.length; j < m; j++) value[j] += current[j] - remaining[j];
+            }
+            else value += current - remaining;
+        }
+
+        // Don't add a keyframe to an animated property if the constraint changed nothing.
+        if (!DuMath.equals(value, current, 4)) new DuAEProperty(prop).setValue(value, time);
+    }
 }
 
-Duik.CmdLib['Constraint']["Apply Constraint"] = "Duik.Constraint.apply()";
 /**
- * Applies copy location and copy rotation constraints, the way Blender's <i>Apply</i> does:
- * the result of the constraint at the current time becomes the value of the property it
- * drives, and its effect is removed.<br />
- * Each constraint is evaluated alone, on the unconstrained value of the layer, and the other
- * constraints are left in place: as in Blender, applying a constraint which isn't the first
- * of its stack may move the layer. The constraints are applied from top to bottom, so applying
- * a whole stack at once keeps the layer where it is.<br />
- * If the property is animated, the value is set with a keyframe at the current time.
- * @param {PropertyBase[]|DuAEProperty[]|DuList.<PropertyBase>} [effects] - The constraint effects,
+ * Finds the constraints among properties.
+ * @private
+ * @param {PropertyBase|DuAEProperty|PropertyBase[]|DuAEProperty[]|DuList.<PropertyBase>} [props] - The constraint effects,
  * or any of their parameters. The selected ones in the active composition if omitted.
- * @return {int} The number of constraints applied.
+ * @param {Boolean} [targetOnly=false] - Set to true to keep only the constraints whose target is set in Duik:
+ * copy location, copy rotation and armature.
+ * @return {Object[]} One <code>{ layer, name, index, kind }</code> per constraint: the constrained
+ * layer, the name and index of the effect, and what it drives, as returned by
+ * {@link Duik.Constraint.constraintKind}.<br />
+ * Constraints are kept by layer and name, as removing an effect invalidates
+ * the references to the other effects of the layer.
  */
-Duik.Constraint.apply = function(effects) {
-    if (!isdef(effects)) {
+Duik.Constraint.getConstraints = function(props, targetOnly) {
+    targetOnly = def(targetOnly, false);
+    if (!isdef(props)) {
         var comp = DuAEProject.getActiveComp();
-        if (!comp) return 0;
-        effects = comp.selectedProperties;
+        if (!comp) return [];
+        props = comp.selectedProperties;
     }
-    effects = new DuList(effects);
+    props = new DuList(props);
 
-    // Constraints are kept by layer and name, as removing an effect invalidates
-    // the references to the other effects of the layer.
     var constraints = [];
     var found = {};
-    for (var i = 0, n = effects.length(); i < n; i++) {
-        var prop = effects.at(i);
+    for (var i = 0, n = props.length(); i < n; i++) {
+        var prop = props.at(i);
         if (prop instanceof DuAEProperty) prop = prop.getProperty();
         if (prop.propertyDepth < 2) continue;
 
@@ -4588,15 +5098,50 @@ Duik.Constraint.apply = function(effects) {
         var effect = prop;
         if (prop.propertyDepth > 2) effect = prop.propertyGroup(prop.propertyDepth - 2);
         if (effect.parentProperty.matchName != 'ADBE Effect Parade') continue;
-        if (!Duik.Constraint.copyConstraintKind(effect)) continue;
+        var kind = Duik.Constraint.constraintKind(effect);
+        if (!kind || (targetOnly && !kind.expression)) continue;
 
         var layer = effect.propertyGroup(2);
         var key = layer.containingComp.id + '/' + layer.index + '/' + effect.propertyIndex;
         if (found[key]) continue;
         found[key] = true;
 
-        constraints.push({ layer: layer, name: effect.name, index: effect.propertyIndex });
+        constraints.push({ layer: layer, name: effect.name, index: effect.propertyIndex, kind: kind });
     }
+
+    return constraints;
+}
+
+/**
+ * Finds the constraints whose target is set in Duik among properties: the copy location,
+ * copy rotation and armature constraints.
+ * @private
+ * @param {PropertyBase|DuAEProperty|PropertyBase[]|DuAEProperty[]|DuList.<PropertyBase>} [props] - The constraint effects,
+ * or any of their parameters. The selected ones in the active composition if omitted.
+ * @return {Object[]} The constraints, as returned by {@link Duik.Constraint.getConstraints}.
+ */
+Duik.Constraint.getTargetConstraints = function(props) {
+    return Duik.Constraint.getConstraints(props, true);
+}
+
+Duik.CmdLib['Constraint']["Apply Constraint"] = "Duik.Constraint.apply()";
+/**
+ * Applies constraints, the way Blender's <i>Apply</i> does: the result of the constraint at the
+ * current time becomes the value of the properties it drives, and its effect is removed.<br />
+ * This works with the position, copy location, orientation, copy rotation, path, parent and armature constraints.<br />
+ * A copy location, copy rotation or armature constraint is evaluated alone, on the unconstrained value of
+ * the layer, and the other constraints are left in place: as in Blender, applying a constraint which isn't
+ * the first of its stack may move the layer. The constraints are applied from top to bottom, so applying
+ * a whole stack at once keeps the layer where it is.<br />
+ * The position, orientation and parent constraints don't stack: each one adds its own share to the
+ * layer, so applying any of them keeps the layer where it is.<br />
+ * If a property is animated, the value is set with a keyframe at the current time.
+ * @param {PropertyBase[]|DuAEProperty[]|DuList.<PropertyBase>} [effects] - The constraint effects,
+ * or any of their parameters. The selected ones in the active composition if omitted.
+ * @return {int} The number of constraints applied.
+ */
+Duik.Constraint.apply = function(effects) {
+    var constraints = Duik.Constraint.getConstraints(effects);
     if (constraints.length == 0) return 0;
 
     // Top to bottom, as the stack is evaluated. The order between layers doesn't matter:
