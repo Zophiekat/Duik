@@ -691,9 +691,8 @@ function buildAutomationPanelUI(tab, standAlone ) {
     mainGroup.alignment = ['fill', 'fill'];
 
     var automationGroup = DuScriptUI.group(mainGroup, 'column');
-    if (uiMode >= 2) automationGroup.spacing = 3;
 
-    var line1 = DuScriptUI.group(automationGroup, uiMode >= 2 ? 'row' : 'column');
+    var line1 = DuScriptUI.group(automationGroup, 'column');
 
     createKleanerButton( line1 );
 
@@ -712,8 +711,7 @@ function buildAutomationPanelUI(tab, standAlone ) {
         i18n._("Control properties using a map (texture) layer."),
         false,
         undefined,
-        undefined,
-        false
+        undefined
     );
     effectorMapButton.onClick = function() {
         if (!effectorMapGroup.built) {
@@ -812,7 +810,7 @@ function buildAutomationPanelUI(tab, standAlone ) {
         };
     };
 
-    var line2 = DuScriptUI.group(automationGroup, uiMode >= 2 ? 'row' : 'column');
+    var line2 = DuScriptUI.group(automationGroup, 'column');
     
     var swinkButton = DuScriptUI.multiButton(
             line2,
@@ -879,7 +877,7 @@ function buildAutomationPanelUI(tab, standAlone ) {
     motionTrailButton.onClick = Duik.Automation.motionTrail;
     motionTrailButton.onAltClick = function() { Duik.Automation.motionTrail(true) };
 
-    var line3 = DuScriptUI.group(automationGroup, uiMode >= 2 ? 'row' : 'column');
+    var line3 = DuScriptUI.group(automationGroup, 'column');
 
     var walkButton = DuScriptUI.button( line3, {
         text: i18n._("Walk/Run cycle"),

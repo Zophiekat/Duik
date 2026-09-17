@@ -144,7 +144,7 @@ function buildControllersUI(tab, standAlone)
                 DuESF.scriptSettings.save();
             }
 
-            DuScriptUI.separator( editGroup, uiMode <= 1 ? i18n._("Current Selection") : '' );
+            DuScriptUI.separator( editGroup, i18n._("Current Selection") );
 
             var sideEditGroup = addSetting(editGroup, i18n._("Side"));
             var sideEditSelector = createSideSelector( sideEditGroup );

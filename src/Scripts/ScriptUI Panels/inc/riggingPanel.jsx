@@ -16,19 +16,19 @@ function buildRiggingPanelUI( tab )
     );*/
 
     var bonesTab = riggingTabPanel.addTab(
-        uiMode == 0 ? i18n._("Bones") : "",
+        i18n._("Bones"),
         w16_bones,
         "Create bone structures"
     );
 
     var constraintsTab = riggingTabPanel.addTab(
-        uiMode == 0 ? i18n._("Links and constraints") : "",
+        i18n._("Links and constraints"),
         w16_constraint,
         "Links and constraints"
     );
 
     var controllersTab = riggingTabPanel.addTab(
-        uiMode == 0 ? i18n._("Controllers") : "",
+        i18n._("Controllers"),
         w16_controller,
         "Create controllers"
     );

@@ -165,8 +165,7 @@ function buildNotePanelUI( container )
         i18n._("Select the file where to save the notes."),
         false,
         undefined,
-        undefined,
-        false // Don't localize (already localized)
+        undefined
     );
     fileButton.alignment = ['left', 'bottom'];
     fileButton.onClick = function()
@@ -189,8 +188,7 @@ function buildNotePanelUI( container )
         i18n._("Select the file where to save the notes."),
         false,
         undefined,
-        undefined,
-        false // Don't localize (already localized)
+        undefined
     );
     saveAsButton.alignment = ['left', 'bottom'];
     saveAsButton.onClick = function()

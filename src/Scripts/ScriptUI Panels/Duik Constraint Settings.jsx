@@ -4,6 +4,7 @@ var mainScriptFile = new File($.fileName);
 
 #include "inc/core.jsx"
 
+#include "inc/nativeUI/nativeUI.jsx"
 #include "inc/constraintSettingsPanel.jsx"
 buildConstraintSettingsUI( ui.mainGroup );
 

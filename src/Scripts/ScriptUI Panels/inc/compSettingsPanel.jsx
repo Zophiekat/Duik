@@ -237,7 +237,7 @@ function buildCompSettingsPanel( container ) {
         text: '00:00:00:00'
     });
 
-    DuScriptUI.separator( container, uiMode <= 1 ? i18n._("Display") : '' );
+    DuScriptUI.separator( container, i18n._("Display") );
 
     var resolutionGroup = addSetting(container, i18n._("Resolution"));
     var resolutionEdit = DuScriptUI.selector( resolutionGroup );
@@ -259,7 +259,7 @@ function buildCompSettingsPanel( container ) {
     var shyGroup = addSetting(container, i18n._("Shy layers"));
     var shyEdit = DuScriptUI.checkBox( shyGroup, { text: i18n._("Hide") } );
 
-    DuScriptUI.separator( container, uiMode <= 1 ? i18n._("Rendering") : '' );
+    DuScriptUI.separator( container, i18n._("Rendering") );
 
     var proxyGroup = addSetting(container, i18n._("Proxy"));
     var proxyEdit = DuScriptUI.checkBox( proxyGroup, { text: i18n._("Use") } );
@@ -280,7 +280,7 @@ function buildCompSettingsPanel( container ) {
     var frameBlendingGroup = addSetting(container, i18n._("Frame blending"));
     var frameBlendingEdit = DuScriptUI.checkBox( frameBlendingGroup, { text: i18n._("Enabled") } );
 
-    DuScriptUI.separator( container, uiMode <= 1 ? i18n._("Motion blur") : '' );
+    DuScriptUI.separator( container, i18n._("Motion blur") );
 
     var mbGroup = addSetting(container, i18n._("Motion blur"));
     var mbEdit = DuScriptUI.checkBox( mbGroup, { text: i18n._("Enabled") } );

@@ -11,9 +11,6 @@ function buildUI()
     #include "settings.jsx"
     buildSettingsUI( ui.settingsGroup );
 
-    // Get the UI mode
-    var uiMode = DuESF.scriptSettings.get("common/uiMode", 0);
-
     // Add Sanity status without label
     var sanityIcon = DuSanity.UI.button( ui.bottomGroup, false );
     sanityIcon.alignment = ['right', 'fill'];

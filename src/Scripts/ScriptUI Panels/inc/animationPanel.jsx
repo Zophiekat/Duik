@@ -405,9 +405,8 @@
     mainGroup.alignment = ['fill', 'fill'];
 
     var animationGroup = DuScriptUI.group(mainGroup, 'column');
-    if (uiMode >= 2) animationGroup.spacing = 3;
 
-    if (uiMode < 2) DuScriptUI.separator( animationGroup, uiMode <= 1 ? i18n._("Tweening") : ''  );
+    DuScriptUI.separator( animationGroup, i18n._("Tweening")  );
 
     var tweenTools = DuScriptUI.toolBar(animationGroup, 4);
 
@@ -527,7 +526,7 @@
         Duik.Animation.tween( tweenSlider.value / 100, animatedProps, selectedLayers);
     };
 
-    DuScriptUI.separator( animationGroup, uiMode <= 1 ? i18n._("Temporal interpolation") : '' );
+    DuScriptUI.separator( animationGroup, i18n._("Temporal interpolation") );
 
     var keyEditGroup = DuScriptUI.group( animationGroup, 'row' );
     var ksettingsButton = DuScriptUI.button(
@@ -972,7 +971,7 @@
         Duik.Animation.setVelocity( velocityInSlider.value, velocityOutSlider.value );
     };
 
-    DuScriptUI.separator( animationGroup, uiMode <= 1 ? i18n._("Spatial interpolation") : '' );
+    DuScriptUI.separator( animationGroup, i18n._("Spatial interpolation") );
 
     var spatialInterpolationGroup = DuScriptUI.group( animationGroup, 'row' );
 
@@ -1006,7 +1005,7 @@
     spatialBezierInButton.onClick = Duik.Animation.setSpatialBezierIn;
     var spatialAutoButton = DuScriptUI.button(
         spatialInterpolationGroup,
-        uiMode >= 2 ? '': i18n._("Fix"),
+        i18n._("Fix"),
         w16_autorig,
         i18n._("Automatically fix spatial interpolation for selected keyframes.")
     );
@@ -1014,7 +1013,7 @@
 
     DuScriptUI.separator( animationGroup );
 
-    var line1 = DuScriptUI.group(animationGroup, uiMode >= 2 ? 'row' : 'column');
+    var line1 = DuScriptUI.group(animationGroup, 'column');
 
     var animationLibButton = DuScriptUI.button(
         line1,
@@ -1056,7 +1055,6 @@
         undefined, // orientation
         undefined, // alignment
         undefined, // localize
-        undefined, // ingore ui mode
         undefined, // options without button
         undefined, // options button text
         true // options without panel

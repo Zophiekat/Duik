@@ -9579,8 +9579,6 @@ DuScriptUI.String = {
     EDIT_ITEM_OR_CAT: "Edit selected item or category",
     EDIT_SETTINGS: "Edit settings",
     EFFECTS: "Effects",
-    EXPERT: "Expert",
-    EXPERT_UI_TIP: "The smallest UI, for expert users.",
     EYE: "Eye",
     EYES: "Eyes",
     EYEBROW: "Eyebrow",
@@ -9666,8 +9664,6 @@ DuScriptUI.String = {
     RESET_SETTINGS: "Reset the settings to their default values.",
     RIGHT: "Right",
     RIGHT_SHORT: "R",
-    ROOKIE: "Rookie",
-    ROOKIE_UI_TIP: "The easiest-to-use mode, but also the biggest UI.",
     ROTATION: "Rotation",
     ROUNDED_RECTANGLE: "Rounded rectangle",
     RUN_EXECUTE: "Run",
@@ -9691,8 +9687,6 @@ DuScriptUI.String = {
     SIZE: "Size",
     SNAKE: "Snake",
     SPINE: "Spine",
-    STANDARD: "Standard",
-    STANDARD_UI_TIP: "The standard not-too-big UI.",
     START_TYPING_CMD: "Start typing something...",
     TAIL: "Tail",
     TAIL_SHORT: "Tl",
@@ -9944,21 +9938,6 @@ w16_user;
 var w16_bug = new DuBinary( "\u0089PNG\r\n\x1A\n\x00\x00\x00\rIHDR\x00\x00\x00\x10\x00\x00\x00\x10\b\x06\x00\x00\x00\x1F\u00F3\u00FFa\x00\x00\x00\tpHYs\x00\x00\x07a\x00\x00\x07a\x01\u0095\u00C3\u00B8\u00B6\x00\x00\x00\x19tEXtSoftware\x00www.inkscape.org\u009B\u00EE<\x1A\x00\x00\x01\u009BIDAT8\u008D\u008D\u0092\u00B1\u008B\x13Q\x10\u00C6\x7F\u00F3\u00DE.\u00C6\u00E6\u00AC\x14\u00AC\x15,$J\"\u00D8\u00E8\u00A1x\u00DD\u00EE\u00C5\u0084-\u00F2Oha#X\u00A6\u00F4/\u00D0\u00BF\"\u0081\u0087\u00F2\x04\u00D1\u00A0\u00DC]\u00A5\u008D\u00DC\x156\u0087\u00D8\x1D\u008A\u00CD\u0081hn_\u00DE\u00D8\u00E4\u0096\u00B0\u00EC\u00E1~\u00D503\u00DF\u00F7\u00CD\f#4\u00C0{\u00BFQ\u0096\u00E5s\u00E0!`E\u00E4M\b\u00E1iQ\x14\u00BF\u00EA\u00BDROL&\x13\u00D3\u00EB\u00F5\u00E6\u00C0\u00BDZ\u00E9\u00CBb\u00B1\u00B8=\x1E\u008FO\u00D6\u0093\u00A6.\u00D0\u00EF\u00F7\u00EF7\u0090\x01nv:\u009DA\u00E3\x04\u00CE\u00B9\x1D\x119\x1FB\u00C8\u00D24\u00BD\u00B2\\.\u0087M\u00AB\x19c\u00DE\u0086\x10\x0E\u0092$\u00F1\u00AA\u00FAg8\x1Cn&\u00AB\u00DA9U\u00BDe\u00AD\u009D\u00C7\x18\u00B7F\u00A3\u00D1\u00B3&\u0081\u00D9lv\u00C9Z;W\u00D5\u00EB\u00C0g\u0080\x04 M\u00D3\u00BC,\u00CB\u00F7@\x178r\u00CE5\u00F1\u00D7\u00F15I\u0092\x01\u00ACn\u0090e\u00D9O\x11y\u00F2?\u00D6\u00DA*\u008F\u00F3<?\u00AA\x04VX\u00D6\x1BU5\x17\u0091\u00AC\u009E\x0F!T\u00BD\u00E2\u009C\u00DB\x01\u00EE\u009Ea\u00F6@D\u00A2\u00AA~8\u00A3\u00BEgD$\u00B4\x1D\u00BD\x01\u00A1z$\u00E7\u00DC\x1D`\u00B7\u00CD\x04\u00C6\u0098\u00CD\u00C1`\u00B0\x0Bk7\b!|\x07\u00B4\u00A5\u00F3\u00B7J\u00EC4\x10\u0091\x13\u00E0\u00B8\x05\u00F98\u00C6X\u00ADm\x00\u00BC\u00F7\x17\u00AD\u00B5\u00EF\u0080\x0B-\x046\u0080\u008F\u00D3\u00E9\u00F4r%P\u0096\u00A5\x07\u00BA\u00AAz\u00A0\u00AA7T\u00F5\x05p(\"1\u00C6\x18\u0081C\u00E0\u00A5\u00B5\u00B6\x0B\u00EC\x03\u00D7\u00D24}\x05\u00ABO\x04~\x03\u009Fb\u008C\u00DBEQ\u00FC\x00\x1E\u00D5\\\u00AF\u009E\x06\u00DE\u00FB\u00AD\x10\u00C2kU\u00FD\x0B\u00F0\x0Fk\u009B\u00A0\x10\u009B\u00CE\u00DB\u00A2\x00\x00\x00\x00IEND\u00AEB`\u0082", "w16_bug.png", "w16" );
 w16_bug;
 
-// ====== w16_rookie.png.jsxinc======
-
-var w16_rookie = new DuBinary( "\u0089PNG\r\n\x1A\n\x00\x00\x00\rIHDR\x00\x00\x00\x10\x00\x00\x00\x10\b\x06\x00\x00\x00\x1F\u00F3\u00FFa\x00\x00\x00\tpHYs\x00\x00\x07a\x00\x00\x07a\x01\u0095\u00C3\u00B8\u00B6\x00\x00\x00\x19tEXtSoftware\x00www.inkscape.org\u009B\u00EE<\x1A\x00\x00\x00\u00F5IDAT8\u008D\u00DD\u00921N\x031\x10E\u00FF\u008C\u00B1\u00BD\x12\x1D\x14\u00D4Pp\x05n@\u00B4\u00ABu\u00EB\u00823\u00E4N\u00D0\u0081\\lOI.\u00C0\x01\u0090(\"%\r\x01\u00CA\u0095!\u008CiR$Y\u009Bl\u00CD/\u00FF\u00BC\u00F9\x1A\u00CD\f\u00A1\u00A0\u00AE\u00EBN\u0095R\u00CF\x0043_9\u00E7\u00E69\u008EK\x01UU1\x11\x1D\x03\u00B0\x00~J\\1\u00A0\u00AE\u00EB\u0095\u0088\u00CCRJOm\u00DB.K\x1C\u00E5\u00CC\x10\u00C2\u00891\u00E6\u009E\u0088\u00AE7\u00D6c\u008C\u00F1\u00C6{\u00FF1j\x02c\u00CCt\u00AB\x19\x00&\u00C6\u0098i\u008E=*L\u00F6\x0E\u00E03\u00E3\u008D\x0B\x10\u0091\x07\u00AD\u00F5BD4\x000\u00F3w\u00DF\u00F7\u00B3\x1C;\u00D8A\bAYk_\x00\u009C\u00EF\u0095^c\u008C\u0097\u00DE\u00FB\u009D\u008B\fv`\u00AD=\u00CB4\x03\u00C0\u00C5\u00A6\u00B6\u00A3A\x003g/S\u00AA\x15\u00FF`\u00AC\u00FEc\u0080R\u00EA\u00EB\x0F>\x1E\fh\u009A\u00E6-\u00A5t\x07`\u00BDe\u00AF\u0089\u00E8\u00D69\u00B7\u00DA\u00E7\x7F\x01\u008D\u00CA@c^Wf\u00EE\x00\x00\x00\x00IEND\u00AEB`\u0082", "w16_rookie.png", "w16" );
-w16_rookie;
-
-// ====== w16_standard.png.jsxinc======
-
-var w16_standard = new DuBinary( "\u0089PNG\r\n\x1A\n\x00\x00\x00\rIHDR\x00\x00\x00\x10\x00\x00\x00\x10\b\x06\x00\x00\x00\x1F\u00F3\u00FFa\x00\x00\x00\tpHYs\x00\x00\x07a\x00\x00\x07a\x01\u0095\u00C3\u00B8\u00B6\x00\x00\x00\x19tEXtSoftware\x00www.inkscape.org\u009B\u00EE<\x1A\x00\x00\x01\x14IDAT8\u008D\u00AD\u0090\u00B1J\u00C4P\x10E\u00EF\r/E\x14\x11\u00EB\u00E0G\u00F8\x07j\u00A3\u00A4H\u00D2+X\u00A6\x10\x11\u00B5\u00B1L-\b\x16\"\x04\u00ACm\u0084%oI\u00E1\x0Fh\x15\u00F4\x03,l\u0084\u00D4\u00E2\u0082\x04\u0097\\\x1Bw\u00D9,\u00C8n\u00D4\u00A9f\x06\u00CE\u0099\u00CB\x00\x7F,\u008E\u009A,\u00CB\\\u00DF\u00F7Wg\x01M\u00D3\u00A8\u00AA\u00AA\u00D7$I>[\x02k\u00ED9\u0080\u00E39\x0F\u00D7\x00\u00AE]\u00D7=1\u00E3(\u00E4\u00A2\u00A4Y\u00A0$\u009D\x01X#\u00B9?\x1C\x0E\u00DF\u00CD,bZ\x10\u00C7\u00F1\u00A9$Zk\u00EF\x01\u00EC8\x1D\x05\u00A3\u00B4\"\u00F9\x01`\u00B9k\x02\u00E6y\u00BE\u00E58\u00CE\u00BA\u00A4M\u00927\u009D\x05$\u00EF\u00BE\x7F\u00F5@\u00F2p,\u00904\u0098C0\x00\u00B0\x07\u00E0%\u008A\u00A2'\x00\u0098\x14\u00F4H\x1E\x01\u00F8\u00F1/$o\u00C30\u00EC\u00B5v\u0093\u0083\u00B5v\x03\u00C0.\u0080\u00A5)V$\x1F\u008D1\x17A\x10\u00D4-A\u00BF\u00DF?\x00\u00B00G\u00FC\u00B6QR]\u00D7WFR\x00`\u00BB\u00AB\x00\u00C0\u00B3\u00E7y\u0097\x04\u0080\u00A2(V\u00BA\u00D2eY\u00BE\u00A5i\u00DA\u00FC\u00E2\u00F0?\u00D7\x17=\x05_\u00E7\u00F7_.`\x00\x00\x00\x00IEND\u00AEB`\u0082", "w16_standard.png", "w16" );
-w16_standard;
-
-// ====== w16_expert.png.jsxinc======
-
-var w16_expert = new DuBinary( "\u0089PNG\r\n\x1A\n\x00\x00\x00\rIHDR\x00\x00\x00\x10\x00\x00\x00\x10\b\x06\x00\x00\x00\x1F\u00F3\u00FFa\x00\x00\x00\tpHYs\x00\x00\x07`\x00\x00\x07`\x01G\u0084ZR\x00\x00\x00\x19tEXtSoftware\x00www.inkscape.org\u009B\u00EE<\x1A\x00\x00\x01\x00IDAT8\u008D\u00C5\u0092\u00B1J\u00C4@\x14E\u00CF\x0B\u008B\u0084\u00FD\b;;k\u00F1\x03,l\x02CZ+\x0B+\x0B+E\u00D1\u00D2Fp\u00F1\x07\u00FC\x02\u00AB$*\u00C8\u00B6\u0082\u00B0`)h\u00A1\u009D\u009D\u00F5J\u009A\u00CC\u00B5I`v@6\u00B1\u00F1V\u00EF\u00DD\u00CB=\u00BC\u0081\u00B1\u00AA\u00AAf\u00926X\u00AEoI\u00DB\u00CE\u00B9\u00C7\u00D0Lz\u0096\x01\u00C6f\u00B6\x1E\u009BV\u0096\u00A5z\x02\x00\u00DE\u0080O\u00E0+I\u0092\u009B,\u00CB\u008A\x05\u0080\u00A4\u00A9\u0099%\u00C0\x160\x07\u00AE\u0081\u0083\u00DFhf\u00B6\u009FD\u00C6-p\u00D7\u00AE\u00EFi\u009A\u009E\u0086\u00B9\u00A4\u00A9\u00A4\x0B\u00E0\x19\u00C0{\x7F\u00B4\x00X&3+\u009Cs\u00C7\u00C0\u00A4\u00DDW\x07\x01\u0082K\u00BAg\u00DB\u009F\x00\u00A1\u00FE\x1D\u00A0\u00D1\u00C0\u00C2JQ\x14\u00BBfv\u00D2\u00EE\x1FC\x01\u0097f\u00D6u\u00BC\u00A4\u00B3\x18\u00B0\x03X;\u00AF\u00D5u}\x15\u00E5#@\u00C0\u0083\u00A4s\u00E7\u00DCS\f\u00D8\f\u00E61\u00B0\x17\u00E5\u00F7M\u00D3\x1C\u00E6y\u00FE\u00DA\x19C?R\x15\u0096;\u00C0\u00ACg\x7F\u00EE\u00BD\x7F\u0089\u00CD\x1FA\x0EY\u0090\u00AEi\u0085\u009B\x00\x00\x00\x00IEND\u00AEB`\u0082", "w16_expert.png", "w16" );
-w16_expert;
-
 // ====== w16_placeholder.png.jsxinc======
 
 var w16_placeholder = new DuBinary( "\u0089PNG\r\n\x1A\n\x00\x00\x00\rIHDR\x00\x00\x00\x10\x00\x00\x00\x10\b\x06\x00\x00\x00\x1F\u00F3\u00FFa\x00\x00\x00\tpHYs\x00\x00\x07a\x00\x00\x07a\x01\u0095\u00C3\u00B8\u00B6\x00\x00\x00\x19tEXtSoftware\x00www.inkscape.org\u009B\u00EE<\x1A\x00\x00\x017IDAT8\u008D\u0095\u0093AN\x021\x14\u0086\u00BF\u00D7\u00E2\x19p\b\t;0\u009C\u00C0\u009D\u008A\x1E\u00C0\x13hf`H\u00E0B\u00930q\u00B8\u0088\u00A2\u00EE<\u0081\x11v$\x06\u00C2!\u00A6u\u00D3!\u00A5 \u0084\u00B7j\u00DA\u00FE_\u00FF\u00FF\u00BDT\u00FA\u00FD\u00FE\u00A3\u0088d\u00C0%\u00E7\u00D5\x1A\x18\u00D5\x02\u00F1/\u00B09!\u00AC\x03M \x02\u00B2Z\u00F0\u00F2EY\u0096O\u00D3\u00E9\u00F4\u00FB\u00902M\u00D3\u00B6\u00B5\u00F6\u00DD\u00DB\u008A\u0094[,\u009D\u00A5\u00BA\u00D6\u00FA5I\u0092N(\x1E\x0E\u0087W\u00D6\u00DA\x0F\u00A0\u00E1\u00EE.\x01*\u00C0ZDn\u0081\x15\x10)\u00A5>\u00E38\u00EE\u00FA/\x1Bc\u00DE\u009C\u00EDMY\u0096\x0F\x0E\u00B2\x05\u0090\u00E7\u00F9BD\u00EE\x1C\u00A4\u00AE\u00B5\u009E\u00C5q\u00DC\u00F5l7\u009C\u00B8\u00E7G\u00DC\x02*\u00881\u00A6\u00E7\u00C7\u00F1m\x1Bcn\u00C2\u00FE\u00EC\x00\x00\u008A\u00A2\u0098\u00FBq|\u00DBEQ\u00CC\u00C3\u00FB{\u0080sk\x0F\u0090$I'\u00E8\u00F6\u00D1\u00E9\u00EC\x00\u00D24m+\u00A5f\u00BE\u00EDc\u00D3\x01\u0090\u00C1``\u0081/\x11y\u00FE\u00AF\u00DB\u0087&\u00A1\u00B5~\x01\u00AE+\x07\u00D1\u00B1n\u00E7y\u00BEPJ\u00DD\u00FBq\u009C\u00CBm\u0084\x16'\u00BA=\u0099L~\u0082\u00E9\u00B4\u00AA\b\u00D5\x06\u009C\u00F7\u0099\x00V5`\x04d\x0E\u00D2\u00F4\x0EO\u00D5\x1A\x18\u00FF\x01 \x03\u00A8.\u00A9X\u00C8\t\x00\x00\x00\x00IEND\u00AEB`\u0082", "w16_placeholder.png", "w16" );
@@ -10019,7 +9998,6 @@ DuScriptUI.Icon = {
     CLOSE: w12_close,
     DOWNLOAD: w16_download,
     EDIT: w12_edit,
-    EXPERT: w16_expert,
     EYE_DROPPER: w12_eye_dropper,
     EYE_DROPPER_BIG: w16_eye_dropper,
     FEATURE: w12_feature,
@@ -10046,12 +10024,10 @@ DuScriptUI.Icon = {
     RANDOM: w16_random,
     REMOVE: w12_remove,
     RESET: w12_reset,
-    ROOKIE: w16_rookie,
     RUN: w12_run,
     RX_PURPLE: w8_rx_purple,
     SETTINGS: w12_settings,
     SETTINGS_FILE: w16_settings_file,
-    STANDARD: w16_standard,
     UPDATE: w12_update,
     USER: w16_user,
     SEARCH: w12_search,
@@ -10805,29 +10781,6 @@ DuScriptUI.scriptPanel = function( container, addSettingsButton, addHelpButton, 
         );
         panel.settingsGroup.colorSelector.setCurrentIndex(0);
         DuDebug.log("ScriptUI: color ready.");
-        // ui mode
-        panel.settingsGroup.uiModeSelector = DuScriptUI.selector(
-            panel.settingsGroup,
-            i18n._("Select the UI mode.")
-        )
-        panel.settingsGroup.uiModeSelector.addButton(
-            i18n._("Rookie"),
-            w16_rookie,
-            i18n._("The easiest-to-use mode, but also the biggest UI.")
-        );
-        panel.settingsGroup.uiModeSelector.addButton(
-            i18n._("Standard"),
-            w16_standard,
-            i18n._("The standard not-too-big UI.")
-        );
-        panel.settingsGroup.uiModeSelector.addButton(
-            i18n._("Expert"),
-            w16_expert,
-            i18n._("The smallest UI, for expert users.")
-        );
-        panel.settingsGroup.uiModeSelector.setCurrentIndex(0);
-        DuDebug.log("ScriptUI: ui mode ready.");
-
         // extract icons and button to open the folder
         var extractIconsGroup = DuScriptUI.group(panel.settingsGroup, 'row');
         panel.settingsGroup.extractIconsButton = DuScriptUI.checkBox (
@@ -10896,15 +10849,11 @@ DuScriptUI.scriptPanel = function( container, addSettingsButton, addHelpButton, 
             var highlightSelection = DuESF.scriptSettings.get("common/highlightSelection", 0);
             var currentLanguageName = DuESF.scriptSettings.get("common/currentLanguageName", 'Esperanto');
             var debug = DuESF.scriptSettings.get("common/debug", false);
-            var uiMode = DuESF.scriptSettings.get("common/uiMode", 0);
             var customColor = new DuColor( DuESF.scriptSettings.get("common/highlightColor", DuColor.Color.APP_HIGHLIGHT_COLOR) );
             var extractIcons = DuESF.scriptSettings.get("common/extractIcons", false);
             
             // Settings File
             panel.settingsGroup.fileButton.setPath( DuESF.scriptSettings.file.absoluteURI );
-
-            // Ui mode
-            panel.settingsGroup.uiModeSelector.setCurrentIndex( uiMode );
 
             // Color
             panel.settingsGroup.colorSelector.setCurrentIndex( highlightSelection, true );
@@ -10985,9 +10934,6 @@ DuScriptUI.scriptPanel = function( container, addSettingsButton, addHelpButton, 
         }
 
         // Update and Save settings
-
-        // UI Mode
-        DuESF.scriptSettings.set("common/uiMode", panel.settingsGroup.uiModeSelector.index);
 
         // Color
         var colorIndex = panel.settingsGroup.colorSelector.index;
@@ -11363,13 +11309,12 @@ DuScriptUI.parentWindow = function ( scriptUIControl )
  * @param {Boolean}					[orientation='row']	- The orientation of the button (icon, text, options button). Default will be changed to 'column' if there's no text.
  * @param {Boolean}					[alignment='left']	- The alignment of the button content ('center', 'right' or 'left' for 'row', 'top' 'bottom', 'center' for column).
  * @param {Boolean}					[localize=true]	- Set to false if the text must not be translated.
- * @param {Boolean}					[ignoreUIMode=false]	- Will show texte even if the ui mode is set to > 1 in the script settings
  * @param {Boolean}					[optionsWithoutButton=false]	- Don't add an "ok" button to the options popup
  * @param {string}					[optionsButtonText]	- Change the displayed text of the bottom button of the options
  * @param {Boolean}					[optionsWithoutPanel=false]	- Don't create the options popup panel (use <code>DuButton.onOptions</code> to add your own callback when the options are requested)
  * @return {DuButton}			The image button created.
  */
-DuScriptUI.button = function(container, text, image, helpTip, addOptionsPanel, orientation, alignment, ignoreUIMode, optionsWithoutButton, optionsButtonText, optionsWithoutPanel) {
+DuScriptUI.button = function(container, text, image, helpTip, addOptionsPanel, orientation, alignment, optionsWithoutButton, optionsButtonText, optionsWithoutPanel) {
     if (!isdef( container )) {
         throw 'DuScriptUI: DuScriptUI.button(container, text, image, helpTip, imageOver):\nMissing argument: container.';
     }
@@ -11389,7 +11334,6 @@ DuScriptUI.button = function(container, text, image, helpTip, addOptionsPanel, o
     addOptionsPanel = def(addOptionsPanel, false);
     orientation = def(orientation, 'row');
     localize = def(localize, true);
-    ignoreUIMode = def(ignoreUIMode, false);
     optionsWithoutButton = def(optionsWithoutButton, false);
     optionsWithoutPanel = def(optionsWithoutPanel, false);
     optionsButtonText = def(optionsButtonText, options.text);
@@ -11398,15 +11342,11 @@ DuScriptUI.button = function(container, text, image, helpTip, addOptionsPanel, o
     options.helpTip = def(options.helpTip, helpTip);
     options.options = def(options.options, addOptionsPanel);
     options.orientation = def(options.orientation, orientation);
-    options.ignoreUIMode = def(options.ignoreUIMode, ignoreUIMode);
     options.optionsWithoutButton = def(options.optionsWithoutButton, optionsWithoutButton);
     options.optionsButtonText = def(options.optionsButtonText, optionsButtonText);
     options.optionsWithoutPanel = def(options.optionsWithoutPanel, optionsWithoutPanel);
     options.small = def(options.small, false);
     
-    var uiMode = DuESF.scriptSettings.get("common/uiMode", 0);
-    if (uiMode >= 2 && options.image != '' && !options.ignoreUIMode) options.text = '';
-
     if (!isdef( alignment )) {
         if (options.orientation == 'row' && options.text != '') alignment = 'left';
         else if (options.orientation == 'row') alignment = 'center';
@@ -12517,13 +12457,6 @@ DuScriptUI.checkBox = function( container, text, image, helpTip, textChecked, im
 
     if ( !container ) return null;
 
-    if (options.isTab || options.orientation == 'column')
-    {
-        var commonSettings = def( DuESF.scriptSettings.data.common, {} );
-        var uiMode = def(commonSettings.uiMode, 0);
-        if (uiMode >= 2 && options.image != '') text = '';
-    }
-
     //create ui
     var duCheckBox = container.add( 'group' );
     duCheckBox.orientation = 'column';
@@ -13129,7 +13062,6 @@ DuScriptUI.selector = function( container, helpTip, iconOnly )
         selector.items.push( [ options.text, options.image, options.helpTip, options.data ] );
         //add to popup
         options.localize = false;
-        options.ignoreUIMode = true;
         var button = DuScriptUI.button( selector.popup.buttons, options );
         button.bgColor = DuColor.Color.OBSIDIAN;
         button.dim();
@@ -13618,8 +13550,6 @@ DuScriptUI.folderSelector = function ( container, text, textField, helpTip, orie
     helpTip = def(helpTip, '');
     orientation = def(orientation, 'row');
 
-    if (DuESF.scriptSettings.get("common/uiMode", 0) >= 1) orientation = 'row';
-
     var folderSelector = container.add('group');
     folderSelector.orientation = orientation;
     folderSelector.margins = 0;
@@ -13719,9 +13649,7 @@ DuScriptUI.fileSelector = function ( container, text, textField, helpTip, image,
     mode = def(mode, 'open');
     image = def(image, w12_file);
     filters = def(filters, "All files: *.*");
-    orientation = def(orientation, uiMode >= 1 ? 'row' : 'column');
-
-    var uiMode = DuESF.scriptSettings.get("common/uiMode", 0);
+    orientation = def(orientation, 'column');
 
     var fileSelector = container.add('group');
     fileSelector.orientation = orientation;
@@ -14202,9 +14130,6 @@ DuScriptUI.tabPanel = function( container, tabOrientation )
         image = def (image, '');
         translatable = def (translatable, true);
 
-        var uiMode = DuESF.scriptSettings.get("common/uiMode", 0);
-        if (uiMode >= 2 && image != '') text = '';
-
         // If this button and the previous one have a label, add a spacer
         if (panel.buttons.length > 0)
         {
@@ -14471,10 +14396,9 @@ DuScriptUI.colorSelector = function ( container, helpTip )
  * @param {string} [text] - The text.
  * @param {string|DuBInary} [image] - The path to the icon (or a PNG as a string representation). Default: empty string
  * @param {string} [helpTip] - The help tip to show on the multi button
- * @param {Boolean} [ignoreUIMode=false] - Will show texte even if the ui mode is set to > 1 in the script settings
  * @return {DuSelector} - The multiButton
  */
-DuScriptUI.multiButton = function( container, text, image, helpTip, ignoreUIMode )
+DuScriptUI.multiButton = function( container, text, image, helpTip )
 {
     var options = {};
     text = def(text, '');
@@ -14485,14 +14409,8 @@ DuScriptUI.multiButton = function( container, text, image, helpTip, ignoreUIMode
     if (options.text != '') options.text = options.text + '...';
     helpTip = def(helpTip, '');
     image = def(image, '');
-    ignoreUIMode = def(ignoreUIMode, false);
-
     options.image = def(options.image, image);
     options.helpTip = def(options.helpTip, helpTip);
-    options.ignoreUIMode = def(options.ignoreUIMode, ignoreUIMode);
-
-    var uiMode = DuESF.scriptSettings.get("common/uiMode", 0);
-    if (uiMode >= 2 && image != '' && !options.ignoreUIMode) options.text = '';
 
     var multiButton = container.add( 'group' );
     multiButton.orientation = 'row';
@@ -14605,7 +14523,6 @@ DuScriptUI.multiButton = function( container, text, image, helpTip, ignoreUIMode
                 image: image,
                 helpTip: helpTip,
                 options: addOptionsPanel,
-                ignoreUIMode: true,
                 optionsWithoutButton: optionsWithoutButton,
                 optionsButtonText: optionsButtonText
             } );
@@ -14920,13 +14837,7 @@ DuESF.initMethods.push( DuProgressBar.init );
  */
 DuScriptUI.toolBar = function( container, numCols )
 {
-    var uiMode = DuESF.scriptSettings.get("common/uiMode", 0);
-
-    if (!isdef( numCols ))
-    {
-        if (uiMode == 0) numCols = 3;
-        else numCols = 6;
-    }
+    if (!isdef( numCols )) numCols = 3;
     
     var toolsGroup = DuScriptUI.group( container, 'row' );
     toolsGroup.spacing = 3;
@@ -14936,8 +14847,7 @@ DuScriptUI.toolBar = function( container, numCols )
     toolsGroup.columns = [];
 
     toolsGroup.spacing = 3;
-    if (uiMode == 0) toolsGroup.alignChildren = ['fill', 'top'];
-    else toolsGroup.alignChildren = ['center', 'top'];
+    toolsGroup.alignChildren = ['fill', 'top'];
     for (var i = 0; i < numCols; i++)
     {
         toolsGroup.columns.push( DuScriptUI.group(toolsGroup, 'column') );
@@ -14963,13 +14873,12 @@ DuScriptUI.toolBar = function( container, numCols )
         options.image = def(options.image, icon);
 
         options.localize = false;
-        options.orientation = uiMode == 0 ? 'column' : undefined;
-        options.helpTip = uiMode == 0 ? helpTip : options.text + "\n\n" + helpTip;
-        options.text =  uiMode == 0 ?  options.text : '';
+        options.orientation = 'column';
+        options.helpTip = helpTip;
         
         var button = DuScriptUI.button ( toolsGroup.columns[toolsGroup.currentCol], options);
 
-        button.alignment = uiMode == 0 ? ['fill', 'top'] : ['center', 'top'];
+        button.alignment = ['fill', 'top'];
 
         toolsGroup.currentCol = (toolsGroup.currentCol + 1) % numCols;
 

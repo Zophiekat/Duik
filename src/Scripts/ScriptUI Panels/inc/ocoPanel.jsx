@@ -45,7 +45,6 @@ function buildOCOUI( tab, standAlone )
     // Main group
     var mainGroup = DuScriptUI.group( stackGroup, 'column');
     mainGroup.alignment = ['fill','fill'];
-    if (uiMode >= 2) mainGroup.spacing = 3;
 
     // Character name
     var nameEdit = DuScriptUI.editText(

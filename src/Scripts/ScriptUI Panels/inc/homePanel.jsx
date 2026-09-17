@@ -2,7 +2,7 @@ function buildHomePanelUI( tab )
 {
     var homePanel = DuScriptUI.group( tab, 'column' );
 
-    var line1 = DuScriptUI.group(homePanel, uiMode >= 2 ? 'row' : 'column');
+    var line1 = DuScriptUI.group(homePanel, 'column');
     line1.alignment = ['fill','fill'];
 
     var ocoButton = DuScriptUI.button(
@@ -37,7 +37,7 @@ function buildHomePanelUI( tab )
     );
     controllersButton.alignment = ['fill','fill'];
 
-    var line2 = DuScriptUI.group(homePanel, uiMode >= 2 ? 'row' : 'column');
+    var line2 = DuScriptUI.group(homePanel, 'column');
     line2.alignment = ['fill','fill'];
 
     var automationButton = DuScriptUI.button(
@@ -64,7 +64,7 @@ function buildHomePanelUI( tab )
     );
     cameraButton.alignment = ['fill','fill'];
 
-    var line3 = DuScriptUI.group(homePanel, uiMode >= 2 ? 'row' : 'column');
+    var line3 = DuScriptUI.group(homePanel, 'column');
     line3.alignment = ['fill','fill'];
 
     var toolsButton = DuScriptUI.button(

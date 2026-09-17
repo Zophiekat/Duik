@@ -192,7 +192,7 @@ function buildBonesUI( tab, standAlone )
 
             var boneTypeSelector = createBoneTypeSelector(editGroup);
 
-            DuScriptUI.separator( editGroup, uiMode <= 1 ? i18n._("Current Selection") : '' );
+            DuScriptUI.separator( editGroup, i18n._("Current Selection") );
 
             var sideEditGroup = addSetting(editGroup, i18n._("Side"));
             var sideEditSelector = createSideSelector( sideEditGroup );
@@ -381,7 +381,6 @@ function buildBonesUI( tab, standAlone )
     // Main group
     var mainGroup = DuScriptUI.group( stackGroup, 'column');
     mainGroup.alignment = ['fill','fill'];
-    if (uiMode >= 2) mainGroup.spacing = 3;
 
     // Character name
     var nameEdit = DuScriptUI.editText(
@@ -1122,7 +1121,7 @@ function buildBonesUI( tab, standAlone )
         }       
     }
 
-    var line1 = DuScriptUI.group( mainGroup , uiMode >= 2 ? 'row' : 'column');
+    var line1 = DuScriptUI.group( mainGroup , 'column');
 
     var hominoidGroup = DuScriptUI.multiButton(
         line1,
@@ -1196,7 +1195,7 @@ function buildBonesUI( tab, standAlone )
         createTailButton( this );
     }
 
-    var line2 = DuScriptUI.group( mainGroup , uiMode >= 2 ? 'row' : 'column');
+    var line2 = DuScriptUI.group( mainGroup , 'column');
 
     var birdGroup = DuScriptUI.multiButton(
         line2,
@@ -1231,7 +1230,8 @@ function buildBonesUI( tab, standAlone )
         w16_snake_spine,
         "Add an armature for a snake / worm with a head.",
         true, // Options
-        undefined, // localize
+        undefined, // orientation
+        undefined, // alignment
         undefined, // optionsWithoutButton
         i18n._("Create") // optionsButtonText
     );
@@ -1281,7 +1281,8 @@ function buildBonesUI( tab, standAlone )
         "\n\n"+
         i18n._("[Ctrl]: Automatically parent the selected items (layers, path vertices or puppet pins) to the new bones."),
         true, // Options
-        undefined, // localize
+        undefined, // orientation
+        undefined, // alignment
         undefined, // optionsWithoutButton
         i18n._("Create") // optionsButtonText
     );

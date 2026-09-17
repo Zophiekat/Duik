@@ -8,25 +8,25 @@ function buildToolsPanelUI(tab) {
     var toolsTabPanel = DuScriptUI.tabPanel(tab, 'column');
 
     var compTab = toolsTabPanel.addTab(
-        uiMode == 0 ? i18n._("Composition") : '',
+        i18n._("Composition"),
         w16_composition,
         i18n._("Composition tools (crop, change settings...)")
     );
 
     var layerTab = toolsTabPanel.addTab(
-        uiMode == 0 ? i18n._("Layer") : '',
+        i18n._("Layer"),
         w16_layers,
         i18n._("Layer manager")
     );
 
     var textTab = toolsTabPanel.addTab(
-        uiMode == 0 ? i18n._("Text"): '',
+        i18n._("Text"),
         w16_text,
         i18n._("Text tools (rename, search and replace...)")
     );
 
     var devTab = toolsTabPanel.addTab(
-        uiMode == 0 ? i18n._("Scripting") : '',
+        i18n._("Scripting"),
         w16_expression,
         i18n._("Scripting tools")
     );
@@ -91,7 +91,6 @@ function buildToolsPanelUI(tab) {
         mainGroup.alignment = ['fill', 'fill'];
 
         var textGroup = DuScriptUI.group(mainGroup, 'column');
-        if (uiMode >= 2) textGroup.spacing = 3;
 
         var renameButton = DuScriptUI.button( textGroup, {
             text: i18n._("Rename") + '...',
@@ -592,7 +591,6 @@ function buildToolsPanelUI(tab) {
         mainGroup.alignment = ['fill', 'fill'];
 
         var devGroup = DuScriptUI.group(mainGroup, 'column');
-        if (uiMode >= 2) devGroup.spacing = 3;
 
         var scriptLibButton = DuScriptUI.button(
             devGroup,
