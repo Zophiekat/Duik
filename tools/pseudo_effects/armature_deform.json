@@ -1,0 +1,65 @@
+{
+    "file": "pe_armature_deform",
+    "controlName": "Armature Deform",
+    "matchname": "Pseudo/DUIK armatureDeform v1",
+    "controlArray": [
+        {
+            "index": 0,
+            "name": "DUIK Data",
+            "parent": null,
+            "type": "group",
+            "container": null,
+            "invisible": true
+        },
+        {
+            "index": 0,
+            "name": "DUIK armatureDeform",
+            "hold": true,
+            "parent": null,
+            "type": "checkbox",
+            "keyframes": true,
+            "invisible": true,
+            "default": true,
+            "label": ""
+        },
+        {
+            "type": "endgroup"
+        },
+        {
+            "index": 1,
+            "name": "Bones: set them in Duik",
+            "parent": null,
+            "type": "text",
+            "dim": true
+        },
+        {
+            "index": 2,
+            "name": "Via precomp layer",
+            "hold": true,
+            "parent": null,
+            "type": "checkbox",
+            "keyframes": true,
+            "invisible": false,
+            "default": false,
+            "label": ""
+        },
+        {
+            "index": 3,
+            "name": "Influence",
+            "hold": false,
+            "parent": null,
+            "type": "slider",
+            "keyframes": true,
+            "invisible": false,
+            "default": 100,
+            "smin": 0,
+            "smax": 100,
+            "vmin": 0,
+            "vmax": 100,
+            "precision": "1",
+            "percent": true,
+            "pixel": false,
+            "active": true
+        }
+    ]
+}

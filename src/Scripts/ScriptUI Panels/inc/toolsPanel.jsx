@@ -5,7 +5,7 @@ function buildToolsPanelUI(tab) {
     spacer.spacing = 0;
     spacer.size = [-1, 3];
 
-    var toolsTabPanel = DuScriptUI.tabPanel(tab, 'column');
+    var toolsTabPanel = addNativeTabPanel(tab, 'column');
 
     var compTab = toolsTabPanel.addTab(
         i18n._("Composition"),

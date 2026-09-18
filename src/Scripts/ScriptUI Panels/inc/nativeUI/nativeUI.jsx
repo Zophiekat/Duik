@@ -28,6 +28,8 @@
 #include "addNativeValidButton.jsx"
 #include "addNativeMenuButton.jsx"
 #include "addNativeToolBar.jsx"
+#include "addNativeTabPanel.jsx"
+#include "addNativeFooter.jsx"
 #include "addNativeDropdown.jsx"
 #include "addNativeCheckBox.jsx"
 #include "addNativeSetting.jsx"

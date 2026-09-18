@@ -1,6 +1,6 @@
 function buildMainPanelUI( tab )
 {
-    var mainTabPanel = DuScriptUI.tabPanel( tab );
+    var mainTabPanel = addNativeTabPanel( tab );
     DuScriptUI.setBackgroundColor(mainTabPanel.buttonsGroup, DuColor.Color.DARK_GREY);
 
     // Add tabs
@@ -89,7 +89,7 @@ function buildMainPanelUI( tab )
     cmdTab.button.onAltClick = function() {DuAE.openScriptUIPanel( "Duik Cmd.jsx" ) };
 
     // Notes
-    var notesButton = DuScriptUI.button(
+    var notesButton = addNativeButton(
         mainTabPanel.buttonsGroup,
         '',
         w12_file,

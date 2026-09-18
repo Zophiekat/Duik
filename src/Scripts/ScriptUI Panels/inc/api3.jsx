@@ -16,6 +16,7 @@
 #include "api/bone.jsx"
 #include "api/controller.jsx"
 #include "api/constraint.jsx"
+#include "api/modifier.jsx"
 #include "api/rig.jsx"
 #include "api/automation.jsx"
 #include "api/animation.jsx"

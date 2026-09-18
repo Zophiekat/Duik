@@ -4,12 +4,18 @@ function buildUI()
 
     #include "utils.jsx"
 
+    // Native After Effects controls, used by the panels and by the header and footer below.
+    #include "nativeUI/nativeUI.jsx"
+
     var ui = DuScriptUI.scriptPanel( thisObj, true, true, mainScriptFile );
     ui.addCommonSettings();
 
     // Settings
     #include "settings.jsx"
     buildSettingsUI( ui.settingsGroup );
+
+    // The footer: Duik's own bottom buttons are replaced with native ones.
+    addNativeFooter( ui, mainScriptFile );
 
     // Add Sanity status without label
     var sanityIcon = DuSanity.UI.button( ui.bottomGroup, false );

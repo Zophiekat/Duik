@@ -110,6 +110,7 @@
 #include "icons/w16/w16_blender_icon_con_loclike.png.jsxinc"
 #include "icons/w16/w16_blender_icon_con_rotlike.png.jsxinc"
 #include "icons/w16/w16_blender_icon_constraint.png.jsxinc"
+#include "icons/w16/w16_blender_icon_mod_armature.png.jsxinc"
 #include "icons/w16/w16_body.png.jsxinc"
 #include "icons/w16/w16_bone.png.jsxinc"
 #include "icons/w16/w16_bone_light.png.jsxinc"

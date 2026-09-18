@@ -102,11 +102,13 @@ function addNativeButton(container, text, image, helpTip, options) {
         button.control = button.add('iconbutton', undefined, nativeImage(image), { style: 'button' });
         button.control.text = text;
         button.control.alignment = ['fill', 'center'];
-        // An iconbutton is only as wide as its image, so the text it carries is cropped unless it's
-        // given room: a static text measures the text, then goes away again.
-        var ruler = button.add('statictext', undefined, text);
-        button.control.minimumSize.width = ruler.preferredSize[0] + nativeIconButtonPadding;
-        button.remove(ruler);
+        if (text != '') {
+            // An iconbutton is only as wide as its image, so the text it carries is cropped unless
+            // it's given room: a static text measures the text, then goes away again.
+            var ruler = button.add('statictext', undefined, text);
+            button.control.minimumSize.width = ruler.preferredSize[0] + nativeIconButtonPadding;
+            button.remove(ruler);
+        }
     }
     else {
         if (image) {

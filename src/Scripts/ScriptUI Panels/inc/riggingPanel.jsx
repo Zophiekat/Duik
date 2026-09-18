@@ -6,7 +6,7 @@ function buildRiggingPanelUI( tab )
     spacer.spacing = 0;
     spacer.size = [-1,3];
 
-    var riggingTabPanel = DuScriptUI.tabPanel( tab, 'column' );
+    var riggingTabPanel = addNativeTabPanel( tab, 'column' );
 
     // Add tabs
     /*var ocoTab = riggingTabPanel.addTab(

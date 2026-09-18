@@ -76,6 +76,7 @@ nav:
             - Parent constraints: guide/constraints/parent.md
             - Transform constraints: guide/constraints/transform.md
             - Custom constraints: guide/constraints/custom.md
+            - Armature deform: guide/constraints/armature-deform.md
             - Tools:
                 - List: guide/constraints/tools/list.md
                 - Split Values: guide/constraints/tools/split.md

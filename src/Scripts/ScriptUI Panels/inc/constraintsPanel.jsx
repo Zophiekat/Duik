@@ -1,9 +1,6 @@
 function buildConstraintsUI(tab, standAlone) {
     standAlone = def(standAlone, false);
 
-    // The controls of this panel are native After Effects ones rather than Duik ones: they respond instantly.
-    #include "nativeUI/nativeUI.jsx"
-
     if (!standAlone) {
         // A Spacer
         var spacer = tab.add('group');
@@ -19,6 +16,7 @@ function buildConstraintsUI(tab, standAlone) {
     function hideAllGroups() {
         parentAcrossCompGroup.visible = false;
         constraintSettingsGroup.visible = false;
+        armatureDeformGroup.visible = false;
         pathConstraintGroup.visible = false;
         constraintsGroup.visible = false;
         propInfoGroup.visible = false;
@@ -1686,6 +1684,19 @@ function buildConstraintsUI(tab, standAlone) {
         armatureConstraintButton.onClick = function() { Duik.Constraint.armature(); };
     }
 
+    // A modifier, not a constraint: it deforms the geometry of a layer instead of its transformation,
+    // so it gets its own button rather than a place in the custom constraints menu.
+    var armatureDeformButton = addNativeButton(
+        line2,
+        i18n._("Armature Deform") + '...',
+        w16_blender_icon_mod_armature,
+        i18n._("Deform Bézier paths with an armature: each vertex follows a trio of bones, " +
+                "one for the point and one for each of its handles.\n\n" +
+                "An After Effects version of Blender's \"Armature\" deform modifier, " +
+                "matching the bones to the vertices by index instead of by skin weight.")
+    );
+    armatureDeformButton.onClick = function() { showArmatureDeform(); };
+
     // The native versions of the auto-rig button and of the move anchor points and texture map
     // sub-panels, which other Duik panels build from utils.jsx.
 
@@ -1950,6 +1961,172 @@ function buildConstraintsUI(tab, standAlone) {
         hideAllGroups();
         constraintSettingsGroup.visible = true;
         constraintSettings.refresh();
+    }
+
+    // The armature deform modifier: it reads the bones of an armature by name, so like the
+    // constraints it needs a composition to be picked, and the name of the bones to be typed.
+    var armatureDeformGroup = addNativeGroup(mainGroup, 'column');
+    armatureDeformGroup.visible = false;
+    armatureDeformGroup.built = false;
+
+    function buildNativeArmatureDeformGroup( armatureDeformGroup, mainGroup ) {
+        var titleBar = addNativeSubPanel(
+            armatureDeformGroup,
+            i18n._("Armature deform"),
+            mainGroup
+        );
+
+        var compList;
+        var prefixField;
+        var boneField;
+        var sideField;
+
+        function armatureComp() {
+            if (!compList.key) return null;
+            return DuAEProject.getItemById(compList.key);
+        }
+
+        // Lists the compositions of the project, and selects one of them.
+        function listComps( comp ) {
+            var comps = DuAEProject.getComps();
+            var items = [];
+            for (var i = 0, n = comps.length; i < n; i++)
+                items.push({ name: comps[i].name, key: comps[i].id });
+            compList.setItems(items, comp ? comp.id : compList.key);
+        }
+
+        // Lists the compositions again, and shows what the modifier of the selected path reads,
+        // the way the constraint settings show what a constraint points at.
+        armatureDeformGroup.refresh = function() {
+            var settings = Duik.Modifier.getArmatureDeform();
+            if (!settings) {
+                listComps();
+                return;
+            }
+
+            // Looked up by name, like the expression of the modifier does. The list is set to
+            // None when the composition can't be found anymore.
+            var comp = null;
+            var comps = DuAEProject.getComps();
+            for (var i = 0, n = comps.length; i < n; i++) {
+                if (comps[i].name == settings.comp) {
+                    comp = comps[i];
+                    break;
+                }
+            }
+
+            listComps(comp);
+            if (!comp) compList.select(0);
+            prefixField.text = settings.prefix;
+            boneField.text = settings.bone;
+            sideField.text = settings.side;
+        }
+
+        var refreshButton = titleBar.add(
+            'iconbutton',
+            undefined,
+            nativeImage(w12_blender_icon_file_refresh),
+            { style: 'button' }
+        );
+        refreshButton.helpTip = i18n._("Refresh") + "\n\n" +
+            i18n._("Show what the armature deform modifier of the selected path reads, and update the list of compositions.");
+        refreshButton.alignment = ['left', 'center'];
+        refreshButton.onClick = function() { armatureDeformGroup.refresh(); };
+
+        var armatureSection = addNativeSection( armatureDeformGroup, i18n._("Armature") );
+        // The same height as the lists of the constraint settings, which are slimmer by default.
+        armatureSection.buttonHeight = 20;
+
+        armatureSection.add('statictext', undefined, i18n._("Composition") + ':');
+
+        compList = addSearchList(
+            armatureSection,
+            w12_comp,
+            i18n._("Pick the active composition."),
+            i18n._("The composition holding the bones of the armature.")
+        );
+        compList.pickButton.onClick = function() {
+            var comp = DuAEProject.getActiveComp();
+            if (comp) listComps(comp);
+        }
+
+        var bonesSection = addNativeSection( armatureDeformGroup, i18n._("Bones") );
+
+        bonesSection.add('statictext', undefined, i18n._("Prefix") + ':');
+        prefixField = addNativeEditText(
+            bonesSection,
+            Duik.Modifier.BONE_PREFIX,
+            undefined,
+            i18n._("What the name of the bones starts with, spaces included.") + "\n\n" +
+                i18n._("The bones Duik creates are named \"B < Name > [L]\", so this is \"B < \".")
+        );
+
+        bonesSection.add('statictext', undefined, i18n._("Name") + ':');
+        boneField = addNativeEditText(
+            bonesSection,
+            '',
+            undefined,
+            i18n._("The name of the bones, without their index and their side.") + "\n\n" +
+                i18n._("Each vertex of the path is deformed by the three bones named " +
+                    "\"<Prefix><Name> <Index> Point (Head) >\", \"... Handle Left (Tail) >\" and " +
+                    "\"... Handle Right (Tail) >\", numbered like the vertices of the path.")
+        );
+
+        bonesSection.add('statictext', undefined, i18n._("Side") + ':');
+        sideField = addNativeEditText(
+            bonesSection,
+            '',
+            undefined,
+            i18n._("The side of the bones, as it's written between brackets at the end of their name.") + "\n\n" +
+                i18n._("\"L\" for the bones named \"B < Name > [L]\". Leave it empty for bones with no side.")
+        );
+
+        var validButton = addNativeValidButton(
+            armatureDeformGroup,
+            i18n._("Armature deform"),
+            i18n._("Deform the selected paths with this armature.\n\n" +
+                    "A path which already has the modifier is set to read this armature instead.")
+        );
+        validButton.onClick = function() {
+            var comp = armatureComp();
+            if (!comp) {
+                alert(i18n._("Select the composition holding the armature first."));
+                return;
+            }
+
+            var bone = DuString.trim(boneField.text);
+            if (bone == '') {
+                alert(i18n._("Type the name of the bones first."));
+                return;
+            }
+
+            // The paths are the selected ones, the way the path constraint takes its path.
+            var paths = DuAEComp.getSelectedProps(PropertyValueType.SHAPE);
+            if (paths.length == 0) {
+                alert(i18n._("Select the paths to deform first."));
+                return;
+            }
+
+            // The prefix is used as it's typed: the space before the name of the bones is part of it.
+            Duik.Modifier.armatureDeform(comp, bone, DuString.trim(sideField.text), prefixField.text, paths);
+
+            if (!titleBar.pinned) titleBar.onClose();
+        }
+
+        listComps();
+
+        armatureDeformGroup.built = true;
+        nativeLayout(armatureDeformGroup);
+    }
+
+    function showArmatureDeform() {
+        if (!armatureDeformGroup.built) {
+            buildNativeArmatureDeformGroup(armatureDeformGroup, constraintsGroup);
+        }
+
+        hideAllGroups();
+        armatureDeformGroup.visible = true;
+        armatureDeformGroup.refresh();
     }
 
     var pathConstraintValidButton;

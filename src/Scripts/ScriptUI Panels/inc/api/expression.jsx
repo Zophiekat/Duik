@@ -20,6 +20,7 @@ DuAEExpression.Id.ORIENTATION_CONSTRAINT = "/*== Duik: orientation constraint ==
 DuAEExpression.Id.COPY_LOCATION_CONSTRAINT = "/*== Duik: copy location constraint ==*/";
 DuAEExpression.Id.COPY_ROTATION_CONSTRAINT = "/*== Duik: copy rotation constraint ==*/";
 DuAEExpression.Id.ARMATURE_CONSTRAINT = "/*== Duik: armature constraint ==*/";
+DuAEExpression.Id.ARMATURE_DEFORM_MODIFIER = "/*== Duik: armature deform modifier ==*/";
 DuAEExpression.Id.PATH_CONSTRAINT = "/*== Duik: path constraint ==*/";
 DuAEExpression.Id.AUTORIG_HEAD = "/*== Duik: head autorig ==*/";
 DuAEExpression.Id.SIMPLE_FK = "/*== Duik: simple FK ==*/";
