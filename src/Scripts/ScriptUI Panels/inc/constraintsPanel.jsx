@@ -66,7 +66,9 @@ function buildConstraintsUI(tab, standAlone) {
         w12_zero,
         i18n._("Zero out the selected layers transformation.\n[Alt]: Reset the transformation of the selected layers to 0.\n[Ctrl] + [Alt]: Also reset the opacity to 100 %.")
     );
-    zeroButton.onClick = Duik.Constraint.zero;
+    zeroButton.onClick = function() {
+        Duik.Constraint.zero(undefined, true);
+    };
     zeroButton.onAltClick = Duik.Constraint.resetPRS;
     zeroButton.onCtrlAltClick = function() {
         Duik.Constraint.resetPRS(undefined, true);
@@ -1671,7 +1673,7 @@ function buildConstraintsUI(tab, standAlone) {
             w16_blender_icon_con_rotlike,
             i18n._("Combine the rotation of a layer with the rotation of another one.\n\n" +
                     "An After Effects version of Blender's \"Copy Rotation\" constraint, " +
-                    "with its mix modes and spaces. Works on the rotation around the Z axis.")
+                    "with its axis, Euler orders, mix modes and spaces. It turns 3D layers around their three axis.")
         );
         copyRotationConstraintButton.onClick = function() { Duik.Constraint.copyRotation(); };
 

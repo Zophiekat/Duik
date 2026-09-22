@@ -1,7 +1,7 @@
 {
     "file": "pe_copy_rotation",
     "controlName": "Copy Rotation",
-    "matchname": "Pseudo/DUIK copyRotation v2",
+    "matchname": "Pseudo/DUIK copyRotation v3",
     "controlArray": [
         {
             "index": 0,
@@ -34,7 +34,36 @@
         },
         {
             "index": 2,
-            "name": "Invert",
+            "name": "Euler order",
+            "hold": true,
+            "parent": null,
+            "type": "popup",
+            "keyframes": false,
+            "invisible": false,
+            "default": 1,
+            "options": "Default|XYZ Euler|XZY Euler|YXZ Euler|YZX Euler|ZXY Euler|ZYX Euler"
+        },
+        {
+            "index": 3,
+            "name": "Axis",
+            "parent": null,
+            "type": "text",
+            "dim": true
+        },
+        {
+            "index": 4,
+            "name": "X",
+            "hold": true,
+            "parent": null,
+            "type": "checkbox",
+            "keyframes": true,
+            "invisible": false,
+            "default": true,
+            "label": ""
+        },
+        {
+            "index": 5,
+            "name": "Invert X",
             "hold": true,
             "parent": null,
             "type": "checkbox",
@@ -44,7 +73,51 @@
             "label": ""
         },
         {
-            "index": 3,
+            "index": 6,
+            "name": "Y",
+            "hold": true,
+            "parent": null,
+            "type": "checkbox",
+            "keyframes": true,
+            "invisible": false,
+            "default": true,
+            "label": ""
+        },
+        {
+            "index": 7,
+            "name": "Invert Y",
+            "hold": true,
+            "parent": null,
+            "type": "checkbox",
+            "keyframes": true,
+            "invisible": false,
+            "default": false,
+            "label": ""
+        },
+        {
+            "index": 8,
+            "name": "Z",
+            "hold": true,
+            "parent": null,
+            "type": "checkbox",
+            "keyframes": true,
+            "invisible": false,
+            "default": true,
+            "label": ""
+        },
+        {
+            "index": 9,
+            "name": "Invert Z",
+            "hold": true,
+            "parent": null,
+            "type": "checkbox",
+            "keyframes": true,
+            "invisible": false,
+            "default": false,
+            "label": ""
+        },
+        {
+            "index": 10,
             "name": "Mix mode",
             "hold": true,
             "parent": null,
@@ -55,14 +128,14 @@
             "options": "Replace|Add|Before Original|After Original|Offset (Legacy)"
         },
         {
-            "index": 4,
+            "index": 11,
             "name": "Spaces",
             "parent": null,
             "type": "text",
             "dim": true
         },
         {
-            "index": 5,
+            "index": 12,
             "name": "Target space",
             "hold": true,
             "parent": null,
@@ -73,7 +146,7 @@
             "options": "World Space|Custom Space|Local Space"
         },
         {
-            "index": 6,
+            "index": 13,
             "name": "Owner space",
             "hold": true,
             "parent": null,
@@ -84,7 +157,7 @@
             "options": "World Space|Custom Space|Local Space"
         },
         {
-            "index": 7,
+            "index": 14,
             "name": "Custom space",
             "parent": null,
             "type": "layer",
@@ -92,7 +165,7 @@
             "default": false
         },
         {
-            "index": 8,
+            "index": 15,
             "name": "Influence",
             "hold": false,
             "parent": null,

@@ -365,11 +365,13 @@ Duik.CmdLib['Constraint']["Zero"] = "Duik.Constraint.zero()";
 /**
  * Zero-out selected layers
  * @param {Layer[]|LayerCollection|DuList.<Layer>|Layer} [layers=DuAEComp.getSelectedLayers()] The layer. If omitted, will use all selected layers in the comp
+ * @param {Boolean} [placeBelow=false] Put each zero right below its layer instead of at the bottom of the comp
  * @returns {ShapeLayer[]} The zeroes
  */
-Duik.Constraint.zero = function(layers) {
+Duik.Constraint.zero = function(layers, placeBelow) {
     layers = def(layers, DuAEComp.getSelectedLayers());
     layers = new DuList(layers);
+    placeBelow = def(placeBelow, false);
 
     DuAE.beginUndoGroup( i18n._("Add zero"), false);
     DuAEProject.setProgressMode(true);
@@ -385,6 +387,7 @@ Duik.Constraint.zero = function(layers) {
         zero.rotation.setValue(layer.rotation.value);
 
         Duik.Layer.copyAttributes(zero, layer, Duik.Layer.Type.ZERO);
+        zero.label = layer.label;
 
         layer.parent = zero;
         zero.scale.setValue(layer.scale.value);
@@ -394,7 +397,8 @@ Duik.Constraint.zero = function(layers) {
         zero.parent = layerparent;
 
         //lock and hide
-        zero.moveToEnd();
+        if (placeBelow) zero.moveAfter(layer);
+        else zero.moveToEnd();
         zero.shy = true;
         zero.enabled = false;
         zero.selected = false;
@@ -4027,16 +4031,67 @@ Duik.Constraint.writeTarget = function(layer, compName, layerName, only) {
     for (var matchName in kinds) {
         var kind = kinds[matchName].kind;
         var names = kinds[matchName].names;
-        // Each property driven by the constraint holds the targets in its own expression.
-        for (var i = 0, n = kind.properties.length; i < n; i++) {
-            var prop = layer.transform.property(kind.properties[i]);
-            if (!prop) continue;
-            var targets = Duik.Constraint.bakedTargets(prop.expression);
-            for (var j = 0, m = names.length; j < m; j++)
-                targets[names[j]] = [compName, layerName];
-            prop.expression = kind.expression(targets, kind.properties[i]);
-        }
+        var targets = Duik.Constraint.constraintTargets(layer, kind);
+        for (var j = 0, m = names.length; j < m; j++)
+            targets[names[j]] = [compName, layerName];
+        Duik.Constraint.writeExpressions(layer, kind, targets);
     }
+}
+
+/**
+ * Reads back the targets of the constraints of a kind on a layer, from the expressions they're written in.
+ * @private
+ * @param {Layer} layer - The constrained layer.
+ * @param {Object} kind - The kind of constraint, as returned by {@link Duik.Constraint.constraintKind}.
+ * @return {Object} The targets, as <code>{ effectName: [compName, layerName] }</code>.
+ */
+Duik.Constraint.constraintTargets = function(layer, kind) {
+    var targets = {};
+    for (var i = 0, n = kind.properties.length; i < n; i++) {
+        if (Duik.Constraint.isHiddenProperty(layer, kind.properties[i])) continue;
+        var prop = layer.transform.property(kind.properties[i]);
+        if (!prop || prop.expression.indexOf(kind.id) < 0) continue;
+        var baked = Duik.Constraint.bakedTargets(prop.expression);
+        for (var name in baked) targets[name] = baked[name];
+    }
+    return targets;
+}
+
+/**
+ * Writes the expressions of the constraints of a kind whose target is set in Duik on a layer.
+ * Each property driven by the constraints holds the targets in its own expression.
+ * @private
+ * @param {Layer} layer - The constrained layer.
+ * @param {Object} kind - The kind of constraint, as returned by {@link Duik.Constraint.constraintKind}.
+ * @param {Object} targets - The targets, as <code>{ effectName: [compName, layerName] }</code>.
+ */
+Duik.Constraint.writeExpressions = function(layer, kind, targets) {
+    for (var i = 0, n = kind.properties.length; i < n; i++) {
+        var matchName = kind.properties[i];
+        var prop = layer.transform.property(matchName);
+        if (!prop) continue;
+        // A hidden property is written all the same, so that the constraint is there if the layer
+        // turns 3D: After Effects may refuse, and the expression is then written the next time.
+        if (Duik.Constraint.isHiddenProperty(layer, matchName)) {
+            try { prop.expression = kind.expression(targets, matchName); }
+            catch (e) {}
+            continue;
+        }
+        prop.expression = kind.expression(targets, matchName);
+    }
+}
+
+/**
+ * Tells whether a transform property is hidden on a layer: the X and Y rotations and the orientation
+ * only show on 3D layers, which are the only ones to turn around anything else than Z.
+ * @private
+ * @param {Layer} layer - The layer.
+ * @param {string} matchName - The match name of the transform property.
+ * @return {Boolean} true if the property is hidden.
+ */
+Duik.Constraint.isHiddenProperty = function(layer, matchName) {
+    if (layer.threeDLayer) return false;
+    return matchName == 'ADBE Rotate X' || matchName == 'ADBE Rotate Y' || matchName == 'ADBE Orientation';
 }
 
 /**
@@ -4054,8 +4109,7 @@ Duik.Constraint.getTarget = function(effect) {
     var constraint = Duik.Constraint.getTargetConstraints(effect)[0];
     if (!constraint) return null;
 
-    var prop = constraint.layer.transform.property(constraint.kind.properties[0]);
-    var t = Duik.Constraint.bakedTargets(prop.expression)[constraint.name];
+    var t = Duik.Constraint.constraintTargets(constraint.layer, constraint.kind)[constraint.name];
     return {
         effect: constraint.name,
         comp: t ? t[0] : '',
@@ -4299,30 +4353,379 @@ Duik.Constraint.copyLocation = function(comp, target, layers) {
 }
 
 /**
- * Builds the expression of the copy rotation constraint.
+ * Builds the expressions of the copy rotation constraint: one for each rotation property it drives.<br />
+ * A 2D layer only turns around Z, and the constraint drives its <i>Rotation</i>, which also holds the
+ * rotation of the layer itself: an expression reads the value its own property has before it.<br />
+ * A 3D layer turns around three axis, which After Effects holds in its <i>X</i>, <i>Y</i> and
+ * <i>Z Rotation</i>. The constraint drives the three of them, and the rotation of the layer itself is
+ * its <i>Orientation</i>: an expression can't read what another property held before its own
+ * expression, so a driven rotation can't be read back, while the orientation, which the constraint
+ * leaves alone, can. Each of the three expressions computes the whole rotation and returns its own
+ * angle; they always agree, as they read the same properties and take the same Euler angles.
  * @private
  * @param {Object} [targets] The targets, as <code>{ effectName: [compName, layerName] }</code>.
+ * @param {string} [property='ADBE Rotate Z'] The match name of the property: <code>'ADBE Rotate X'</code>,
+ * <code>'ADBE Rotate Y'</code> or <code>'ADBE Rotate Z'</code>.
  * @return {string} The expression.
  */
-Duik.Constraint.copyRotationExpression = function(targets) {
+Duik.Constraint.copyRotationExpression = function(targets, property) {
+    property = def(property, 'ADBE Rotate Z');
     var p = Duik.PseudoEffect.COPY_ROTATION.props;
 
-    return [DuAEExpression.Id.COPY_ROTATION_CONSTRAINT,
-        DuAEExpression.Library.get(['checkDuikEffect', 'sign']),
-        Duik.Constraint.targetExpression(targets),
+    // The axis this expression drives.
+    var axis = 2;
+    if (property == 'ADBE Rotate X') axis = 0;
+    else if (property == 'ADBE Rotate Y') axis = 1;
+
+    // The rotation of a 3D layer, around its three axis.
+    var threeD = [
+        '// 3x3 matrices are arrays of rows, and turn column vectors.',
+        'function identity() {',
+        '    return [ [1, 0, 0], [0, 1, 0], [0, 0, 1] ];',
+        '}',
+        'function multiply(a, b) {',
+        '    var m = [];',
+        '    for (var r = 0; r < 3; r++) {',
+        '        m.push([]);',
+        '        for (var c = 0; c < 3; c++) m[r].push(a[r][0] * b[0][c] + a[r][1] * b[1][c] + a[r][2] * b[2][c]);',
+        '    }',
+        '    return m;',
+        '}',
+        'function transposed(a) {',
+        '    return [ [a[0][0], a[1][0], a[2][0]], [a[0][1], a[1][1], a[2][1]], [a[0][2], a[1][2], a[2][2]] ];',
+        '}',
+        'function determinant(a) {',
+        '    return a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) -',
+        '        a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0]) +',
+        '        a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);',
+        '}',
         '',
-        '// The mix modes, in the order of the drop down of the effect.',
-        'var REPLACE = 1;',
-        'var ADD = 2;',
-        'var BEFORE_ORIGINAL = 3;',
-        'var AFTER_ORIGINAL = 4;',
-        'var OFFSET_LEGACY = 5;',
+        '// The rotation by an angle in radians around an axis: 0 for X, 1 for Y, 2 for Z.',
+        'function axisRotation(axis, angle) {',
+        '    var c = Math.cos(angle);',
+        '    var s = Math.sin(angle);',
+        '    if (axis == 0) return [ [1, 0, 0], [0, c, -s], [0, s, c] ];',
+        '    if (axis == 1) return [ [c, 0, s], [0, 1, 0], [-s, 0, c] ];',
+        '    return [ [c, -s, 0], [s, c, 0], [0, 0, 1] ];',
+        '}',
         '',
-        '// The spaces, in the order of the drop downs of the effect.',
-        'var WORLD_SPACE = 1;',
-        'var CUSTOM_SPACE = 2;',
-        'var LOCAL_SPACE = 3;',
+        'function d3(v) {',
+        '    if (v.length > 2) return [ v[0], v[1], v[2] ];',
+        '    return [ v[0], v[1], 0 ];',
+        '}',
+        'function dot(a, b) {',
+        '    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];',
+        '}',
+        'function cross(a, b) {',
+        '    return [ a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0] ];',
+        '}',
+        '// The vector at unit length, or null if it has no length.',
+        'function unit(v) {',
+        '    var l = Math.sqrt(dot(v, v));',
+        '    if (l < 1e-9) return null;',
+        '    return [ v[0] / l, v[1] / l, v[2] / l ];',
+        '}',
         '',
+        '// The axis of a layer in the space of its own comp, as the columns of a matrix of unit vectors:',
+        '// the space its children live in, mirrored when the layer or its parents are negatively scaled.',
+        '// The skew of a parent scaled unevenly is left out: X is kept, and Y made square to it.',
+        'function axisOf(l) {',
+        '    var x = d3(l.toWorldVec([1, 0, 0]));',
+        '    var y = d3(l.toWorldVec([0, 1, 0]));',
+        '    // A 2D layer has no depth.',
+        '    var z = unit(d3(l.toWorldVec([0, 0, 1]))) || [0, 0, 1];',
+        '    var mirrored = dot(cross(x, y), z) < 0;',
+        '    x = unit(x) || [1, 0, 0];',
+        '    var d = dot(x, y);',
+        '    y = unit([ y[0] - x[0] * d, y[1] - x[1] * d, y[2] - x[2] * d ]) || unit(cross(z, x)) || [0, 1, 0];',
+        '    z = cross(x, y);',
+        '    if (mirrored) z = [ -z[0], -z[1], -z[2] ];',
+        '    return [ [x[0], y[0], z[0]], [x[1], y[1], z[1]], [x[2], y[2], z[2]] ];',
+        '}',
+        '',
+        '// The axis of the parent of a layer: the space its rotation is expressed in.',
+        'function parentAxisOf(l) {',
+        '    if (!l.hasParent) return identity();',
+        '    return axisOf(l.parent);',
+        '}',
+        '',
+        '// The rotation of a layer in the space of its own comp: its axis, as the columns of a matrix,',
+        '// but its own negative scale doesn\'t turn it, as with a 2D layer.',
+        'function frameOf(l) {',
+        '    var a = axisOf(l);',
+        '    // Cameras and lights have no scale.',
+        '    var s = [];',
+        '    try { s = l.scale.value; }',
+        '    catch (e) {}',
+        '    for (var c = 0; c < s.length && c < 3; c++) {',
+        '        if (s[c] >= 0) continue;',
+        '        for (var r = 0; r < 3; r++) a[r][c] = -a[r][c];',
+        '    }',
+        '    return a;',
+        '}',
+        '',
+        '// A mirrored frame isn\'t a rotation. Flipping its X axis back makes one, the way the rotation',
+        '// of a 2D layer under a mirrored parent is read: it keeps the Y axis seen on screen.',
+        'var FLIP_X = [ [-1, 0, 0], [0, 1, 0], [0, 0, 1] ];',
+        'function rotationOf(frame) {',
+        '    if (determinant(frame) < 0) return multiply(frame, FLIP_X);',
+        '    return frame;',
+        '}',
+        'function frameFrom(rotation, mirrored) {',
+        '    if (mirrored) return multiply(rotation, FLIP_X);',
+        '    return rotation;',
+        '}',
+        '',
+        '// The Euler orders, in the order of the drop down of the effect after "Default": the axis',
+        '// in the order they are applied, and whether they are an odd permutation of X, Y, Z.',
+        'var EULER_ORDERS = [',
+        '    { axis: [0, 1, 2], odd: false },',
+        '    { axis: [0, 2, 1], odd: true },',
+        '    { axis: [1, 0, 2], odd: true },',
+        '    { axis: [1, 2, 0], odd: false },',
+        '    { axis: [2, 0, 1], odd: false },',
+        '    { axis: [2, 1, 0], odd: true }',
+        '];',
+        '// After Effects turns a layer around Z, then Y, then X: its own order is ZYX.',
+        'var AFTER_EFFECTS_ORDER = EULER_ORDERS[5];',
+        'function eulerOrder(v) {',
+        '    if (v < 2) return AFTER_EFFECTS_ORDER;',
+        '    return EULER_ORDERS[v - 2];',
+        '}',
+        '',
+        '// Euler angles in radians -> rotation: the axis are applied in order.',
+        'function eulerToMatrix(e, order) {',
+        '    var a = order.axis;',
+        '    return multiply( axisRotation(a[2], e[a[2]]), multiply( axisRotation(a[1], e[a[1]]), axisRotation(a[0], e[a[0]]) ) );',
+        '}',
+        '',
+        '// Rotation -> the two sets of Euler angles giving it, computed the way Blender does.',
+        'function eulersOf(m, order) {',
+        '    var i = order.axis[0], j = order.axis[1], k = order.axis[2];',
+        '    var cy = Math.sqrt(m[i][i] * m[i][i] + m[j][i] * m[j][i]);',
+        '    var e1 = [0, 0, 0];',
+        '    var e2 = [0, 0, 0];',
+        '    if (cy > 0.0000375) {',
+        '        e1[i] = Math.atan2(m[k][j], m[k][k]);',
+        '        e1[j] = Math.atan2(-m[k][i], cy);',
+        '        e1[k] = Math.atan2(m[j][i], m[i][i]);',
+        '        e2[i] = Math.atan2(-m[k][j], -m[k][k]);',
+        '        e2[j] = Math.atan2(-m[k][i], -cy);',
+        '        e2[k] = Math.atan2(-m[j][i], -m[i][i]);',
+        '    }',
+        '    else {',
+        '        // Gimbal lock: the first and the last axis turn around the same one.',
+        '        e1[i] = Math.atan2(-m[j][k], m[j][j]);',
+        '        e1[j] = Math.atan2(-m[k][i], cy);',
+        '        e2 = [ e1[0], e1[1], e1[2] ];',
+        '    }',
+        '    if (order.odd) return [ [-e1[0], -e1[1], -e1[2]], [-e2[0], -e2[1], -e2[2]] ];',
+        '    return [e1, e2];',
+        '}',
+        '',
+        '// The sum of the differences between two sets of angles.',
+        'function distance(a, b) {',
+        '    return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);',
+        '}',
+        '',
+        '// Rotation -> Euler angles: the set with the smallest angles.',
+        'function eulerOf(m, order) {',
+        '    var e = eulersOf(m, order);',
+        '    if (distance(e[0], [0, 0, 0]) > distance(e[1], [0, 0, 0])) return e[1];',
+        '    return e[0];',
+        '}',
+        '',
+        '// Winds the angles by full turns, to be as close as possible to old ones.',
+        'function compatibleEuler(e, old) {',
+        '    var c = [];',
+        '    for (var a = 0; a < 3; a++) {',
+        '        var d = e[a] - old[a];',
+        '        var turns = 0;',
+        '        if (d > Math.PI) turns = Math.floor(d / (2 * Math.PI) + 0.5);',
+        '        else if (d < -Math.PI) turns = -Math.floor(-d / (2 * Math.PI) + 0.5);',
+        '        c.push(e[a] - turns * 2 * Math.PI);',
+        '    }',
+        '    return c;',
+        '}',
+        '',
+        '// Rotation -> Euler angles: the set closest to old angles, wound to be as close as possible.',
+        'function compatibleEulerOf(m, old, order) {',
+        '    var e = eulersOf(m, order);',
+        '    var e1 = compatibleEuler(e[0], old);',
+        '    var e2 = compatibleEuler(e[1], old);',
+        '    if (distance(e1, old) > distance(e2, old)) return e2;',
+        '    return e1;',
+        '}',
+        '',
+        '// Turns Euler angles by an angle around one of the axis of the rotation they make.',
+        'function rotateEuler(e, order, axis, angle) {',
+        '    var turn = [0, 0, 0];',
+        '    turn[axis] = angle;',
+        '    return eulerOf( multiply( eulerToMatrix(e, order), eulerToMatrix(turn, order) ), order );',
+        '}',
+        '',
+        '// Rotation <-> quaternion, as [w, x, y, z].',
+        'function quaternionOf(m) {',
+        '    var t = m[0][0] + m[1][1] + m[2][2];',
+        '    var s;',
+        '    if (t > 0) {',
+        '        s = 2 * Math.sqrt(1 + t);',
+        '        return [ s / 4, (m[2][1] - m[1][2]) / s, (m[0][2] - m[2][0]) / s, (m[1][0] - m[0][1]) / s ];',
+        '    }',
+        '    if (m[0][0] > m[1][1] && m[0][0] > m[2][2]) {',
+        '        s = 2 * Math.sqrt(1 + m[0][0] - m[1][1] - m[2][2]);',
+        '        return [ (m[2][1] - m[1][2]) / s, s / 4, (m[0][1] + m[1][0]) / s, (m[0][2] + m[2][0]) / s ];',
+        '    }',
+        '    if (m[1][1] > m[2][2]) {',
+        '        s = 2 * Math.sqrt(1 + m[1][1] - m[0][0] - m[2][2]);',
+        '        return [ (m[0][2] - m[2][0]) / s, (m[0][1] + m[1][0]) / s, s / 4, (m[1][2] + m[2][1]) / s ];',
+        '    }',
+        '    s = 2 * Math.sqrt(1 + m[2][2] - m[0][0] - m[1][1]);',
+        '    return [ (m[1][0] - m[0][1]) / s, (m[0][2] + m[2][0]) / s, (m[1][2] + m[2][1]) / s, s / 4 ];',
+        '}',
+        'function quaternionToMatrix(q) {',
+        '    var w = q[0], x = q[1], y = q[2], z = q[3];',
+        '    return [',
+        '        [ 1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w) ],',
+        '        [ 2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w) ],',
+        '        [ 2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y) ]',
+        '    ];',
+        '}',
+        '',
+        '// Blends two rotations the shortest way round, as Blender blends the influence.',
+        'function blend(a, b, t) {',
+        '    var qa = quaternionOf(a);',
+        '    var qb = quaternionOf(b);',
+        '    var d = qa[0] * qb[0] + qa[1] * qb[1] + qa[2] * qb[2] + qa[3] * qb[3];',
+        '    if (d < 0) {',
+        '        d = -d;',
+        '        qa = [ -qa[0], -qa[1], -qa[2], -qa[3] ];',
+        '    }',
+        '    var wa = 1 - t;',
+        '    var wb = t;',
+        '    if (1 - d > 0.0001) {',
+        '        var angle = Math.acos(d);',
+        '        wa = Math.sin((1 - t) * angle) / Math.sin(angle);',
+        '        wb = Math.sin(t * angle) / Math.sin(angle);',
+        '    }',
+        '    var q = [];',
+        '    for (var c = 0; c < 4; c++) q.push(qa[c] * wa + qb[c] * wb);',
+        '    var l = Math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);',
+        '    return quaternionToMatrix([ q[0] / l, q[1] / l, q[2] / l, q[3] / l ]);',
+        '}',
+        '',
+        '// Blender\'s copy rotation: the rotation of the target is copied through Euler angles,',
+        '// axis by axis, and mixed with the rotation of this layer.',
+        'function copiedRotation(fx, own, target) {',
+        '    var order = eulerOrder( fx(' + p['Euler order'].index + ').value );',
+        '    var axis = [ fx(' + p['X'].index + ').value, fx(' + p['Y'].index + ').value, fx(' + p['Z'].index + ').value ];',
+        '    var invert = [ fx(' + p['Invert X'].index + ').value, fx(' + p['Invert Y'].index + ').value, fx(' + p['Invert Z'].index + ').value ];',
+        '    var mixMode = fx(' + p['Mix mode'].index + ').value;',
+        '',
+        '    var ownEuler = eulerOf(own, order);',
+        '    var euler = compatibleEulerOf(target, ownEuler, order);',
+        '',
+        '    // The angles the axis which aren\'t copied keep.',
+        '    var kept = [0, 0, 0];',
+        '    if (mixMode == REPLACE || mixMode == OFFSET_LEGACY) kept = ownEuler;',
+        '',
+        '    for (var a = 0; a < 3; a++) {',
+        '        if (!axis[a]) {',
+        '            euler[a] = kept[a];',
+        '            continue;',
+        '        }',
+        '        if (mixMode == OFFSET_LEGACY) euler = rotateEuler(euler, order, a, ownEuler[a]);',
+        '        if (invert[a]) euler[a] = -euler[a];',
+        '    }',
+        '',
+        '    if (mixMode == ADD) euler = [ euler[0] + ownEuler[0], euler[1] + ownEuler[1], euler[2] + ownEuler[2] ];',
+        '',
+        '    var rotation = eulerToMatrix( compatibleEuler(euler, ownEuler), order );',
+        '    if (mixMode == BEFORE_ORIGINAL) return multiply(rotation, own);',
+        '    if (mixMode == AFTER_ORIGINAL) return multiply(own, rotation);',
+        '    return rotation;',
+        '}',
+        '',
+        '// Degrees around X, Y and Z, in the order After Effects turns a layer, -> rotation.',
+        'function degreesToMatrix(d) {',
+        '    return eulerToMatrix([ degreesToRadians(d[0]), degreesToRadians(d[1]), degreesToRadians(d[2]) ], AFTER_EFFECTS_ORDER);',
+        '}',
+        '',
+        '// The rotation of this layer around its three axis, constrained, in degrees, or null when',
+        '// no constraint applies to it. After Effects turns a layer by its orientation, then by its',
+        '// X, Y and Z rotations: the orientation is the rotation of the layer itself, and these',
+        '// three properties hold the result of the constraint.',
+        'function constrainedRotations() {',
+        '    var parentAxis = parentAxisOf(thisLayer);',
+        '    var orientation = degreesToMatrix(thisLayer.transform.orientation.value);',
+        '',
+        '    // The rotation of this layer in comp space, before any constraint.',
+        '    var ownerFrame = multiply(parentAxis, orientation);',
+        '    var constrained = false;',
+        '',
+        '    for ( var i = 1, n = thisLayer("Effects").numProperties; i <= n; i++ ) {',
+        '        var fx = thisLayer.effect(i);',
+        '        if ( !checkDuikEffect(fx, "DUIK copyRotation") ) continue;',
+        '        if ( !fx.active ) continue;',
+        '',
+        '        var t = targetOf(fx);',
+        '        if (!t) continue;',
+        '',
+        '        // Like Blender, skip the constraints without influence.',
+        '        var influence = fx(' + p['Influence'].index + ').value / 100;',
+        '        if (influence <= 0) continue;',
+        '',
+        '        var customSpace = null;',
+        '        try { customSpace = fx( ' + p['Custom space'].index + ' ); }',
+        '        catch (e) {}',
+        '        // The custom space turns the rotations only, whether its layer is mirrored or not, as on 2D layers.',
+        '        var customRotation = identity();',
+        '        if (customSpace) customRotation = rotationOf(frameOf(customSpace));',
+        '',
+        '        var targetSpace = fx( ' + p['Target space'].index + ' ).value;',
+        '        var ownerSpace = fx( ' + p['Owner space'].index + ' ).value;',
+        '',
+        '        // The rotation of the target, read in the target space.',
+        '        var targetFrame = frameOf(t.layer);',
+        '        if (targetSpace == CUSTOM_SPACE && customSpace)',
+        '            targetFrame = multiply( transposed(customRotation), targetFrame );',
+        '        else if (targetSpace == LOCAL_SPACE)',
+        '            targetFrame = multiply( transposed(parentAxisOf(t.layer)), targetFrame );',
+        '',
+        '        // The rotation of this layer, in the owner space.',
+        '        var space = identity();',
+        '        if (ownerSpace == CUSTOM_SPACE && customSpace) space = customRotation;',
+        '        else if (ownerSpace == LOCAL_SPACE) space = parentAxis;',
+        '        var ownFrame = multiply( transposed(space), ownerFrame );',
+        '',
+        '        var rotation = copiedRotation( fx, rotationOf(ownFrame), rotationOf(targetFrame) );',
+        '',
+        '        // Back to comp space, as mirrored as this layer is.',
+        '        var frame = multiply( space, frameFrom(rotation, determinant(ownFrame) < 0) );',
+        '',
+        '        // Blend with the influence in comp space, like Blender does, so that',
+        '        // several of these effects can be stacked on the same layer.',
+        '        if (influence < 1) {',
+        '            var mirrored = determinant(ownerFrame) < 0;',
+        '            frame = frameFrom( blend(rotationOf(ownerFrame), rotationOf(frame), influence), mirrored );',
+        '        }',
+        '        ownerFrame = frame;',
+        '        constrained = true;',
+        '    }',
+        '',
+        '    if (!constrained) return null;',
+        '',
+        '    // What is left for the X, Y and Z rotations, once the parents and the orientation are',
+        '    // taken out. The smallest angles are taken, so that the three expressions, which each',
+        '    // compute this whole rotation, always return angles from the same set.',
+        '    var rotations = multiply( transposed(orientation), multiply( transposed(parentAxis), ownerFrame ) );',
+        '    var e = eulerOf(rotations, AFTER_EFFECTS_ORDER);',
+        '    return [ radiansToDegrees(e[0]), radiansToDegrees(e[1]), radiansToDegrees(e[2]) ];',
+        '}'
+    ];
+
+    // The rotation of a 2D layer, around Z.
+    var twoD = [
         '// The rotation of a layer around Z, relative to its parent.',
         '// The orientation of 3D layers is a part of it.',
         'function localRotation(l) {',
@@ -4367,79 +4770,130 @@ Duik.Constraint.copyRotationExpression = function(targets) {
         '    return r;',
         '}',
         '',
-        '// Comp space <-> the space the rotation of this layer is expressed in.',
-        '// The contribution of the parents is constant, so it can be taken out',
-        '// once and used to convert both ways without reading our own rotation.',
-        'var orientation = 0;',
-        'if (thisLayer.position.value.length == 3) orientation = thisLayer.orientation.value[2];',
-        'var mirror = scaleMirror(thisLayer);',
-        'var uTurn = scaleUTurn(thisLayer);',
-        'var parents = worldRotation(thisLayer) - localRotation(thisLayer) * mirror - uTurn;',
-        'function toWorldRotation(r) { return r * mirror + uTurn + parents; }',
-        'function toLocalRotation(r) { return (r - uTurn - parents) * mirror; }',
+        'function constrainedRotation() {',
+        '    // Comp space <-> the space the rotation of this layer is expressed in.',
+        '    // The contribution of the parents is constant, so it can be taken out',
+        '    // once and used to convert both ways without reading our own rotation.',
+        '    var orientation = 0;',
+        '    if (thisLayer.position.value.length == 3) orientation = thisLayer.orientation.value[2];',
+        '    var mirror = scaleMirror(thisLayer);',
+        '    var uTurn = scaleUTurn(thisLayer);',
+        '    var parents = worldRotation(thisLayer) - localRotation(thisLayer) * mirror - uTurn;',
+        '    function toWorldRotation(r) { return r * mirror + uTurn + parents; }',
+        '    function toLocalRotation(r) { return (r - uTurn - parents) * mirror; }',
         '',
-        '// The rotation of this layer in comp space, before any constraint.',
-        'var ownerRotation = toWorldRotation( value + orientation );',
-        'var constrained = false;',
+        '    // The rotation of this layer in comp space, before any constraint.',
+        '    var ownerRotation = toWorldRotation( value + orientation );',
+        '    var constrained = false;',
         '',
-        'for ( var i = 1, n = thisLayer("Effects").numProperties; i <= n; i++ ) {',
-        '    var fx = thisLayer.effect(i);',
-        '    if ( !checkDuikEffect(fx, "DUIK copyRotation") ) continue;',
-        '    if ( !fx.active ) continue;',
+        '    for ( var i = 1, n = thisLayer("Effects").numProperties; i <= n; i++ ) {',
+        '        var fx = thisLayer.effect(i);',
+        '        if ( !checkDuikEffect(fx, "DUIK copyRotation") ) continue;',
+        '        if ( !fx.active ) continue;',
         '',
-        '    var t = targetOf(fx);',
-        '    if (!t) continue;',
-        '    var target = t.layer;',
+        '        var t = targetOf(fx);',
+        '        if (!t) continue;',
+        '        var target = t.layer;',
         '',
-        '    var customSpace = null;',
-        '    try { customSpace = fx( ' + p['Custom space'].index + ' ); }',
-        '    catch (e) {}',
-        '    var customRotation = 0;',
-        '    if (customSpace) customRotation = worldRotation(customSpace);',
+        '        // This rotation is around Z only: without it, there\'s nothing to copy.',
+        '        if ( !fx(' + p['Z'].index + ').value ) continue;',
         '',
-        '    var targetSpace = fx( ' + p['Target space'].index + ' ).value;',
-        '    var ownerSpace = fx( ' + p['Owner space'].index + ' ).value;',
+        '        var customSpace = null;',
+        '        try { customSpace = fx( ' + p['Custom space'].index + ' ); }',
+        '        catch (e) {}',
+        '        var customRotation = 0;',
+        '        if (customSpace) customRotation = worldRotation(customSpace);',
         '',
-        '    // The rotation of the target, read in the target space.',
-        '    var targetRotation = worldRotation(target);',
-        '    if (targetSpace == CUSTOM_SPACE && customSpace) targetRotation -= customRotation;',
-        '    else if (targetSpace == LOCAL_SPACE) targetRotation = localRotation(target);',
+        '        var targetSpace = fx( ' + p['Target space'].index + ' ).value;',
+        '        var ownerSpace = fx( ' + p['Owner space'].index + ' ).value;',
         '',
-        '    // The rotation of this layer, in the owner space.',
-        '    var ownRotation = ownerRotation;',
-        '    if (ownerSpace == CUSTOM_SPACE && customSpace) ownRotation -= customRotation;',
-        '    else if (ownerSpace == LOCAL_SPACE) ownRotation = toLocalRotation(ownerRotation);',
+        '        // The rotation of the target, read in the target space.',
+        '        var targetRotation = worldRotation(target);',
+        '        if (targetSpace == CUSTOM_SPACE && customSpace) targetRotation -= customRotation;',
+        '        else if (targetSpace == LOCAL_SPACE) targetRotation = localRotation(target);',
         '',
-        '    var invert = fx(' + p['Invert'].index + ').value;',
-        '    var mixMode = fx(' + p['Mix mode'].index + ').value;',
+        '        // The rotation of this layer, in the owner space.',
+        '        var ownRotation = ownerRotation;',
+        '        if (ownerSpace == CUSTOM_SPACE && customSpace) ownRotation -= customRotation;',
+        '        else if (ownerSpace == LOCAL_SPACE) ownRotation = toLocalRotation(ownerRotation);',
         '',
-        '    // Around a single axis, rotations commute and combine by adding their',
-        '    // angles, so "Add", "Before Original" and "After Original" coincide.',
-        '    // "Offset (Legacy)" differs: it inverts the sum instead of the copy.',
-        '    var rotation;',
-        '    if (mixMode == OFFSET_LEGACY) {',
-        '        rotation = targetRotation + ownRotation;',
-        '        if (invert) rotation = -rotation;',
+        '        var invert = fx(' + p['Invert Z'].index + ').value;',
+        '        var mixMode = fx(' + p['Mix mode'].index + ').value;',
+        '',
+        '        // Around a single axis, rotations commute and combine by adding their',
+        '        // angles, so "Add", "Before Original" and "After Original" coincide.',
+        '        // "Offset (Legacy)" differs: it inverts the sum instead of the copy.',
+        '        var rotation;',
+        '        if (mixMode == OFFSET_LEGACY) {',
+        '            rotation = targetRotation + ownRotation;',
+        '            if (invert) rotation = -rotation;',
+        '        }',
+        '        else {',
+        '            rotation = invert ? -targetRotation : targetRotation;',
+        '            if (mixMode != REPLACE) rotation += ownRotation;',
+        '        }',
+        '',
+        '        // Back to comp space.',
+        '        if (ownerSpace == CUSTOM_SPACE && customSpace) rotation += customRotation;',
+        '        else if (ownerSpace == LOCAL_SPACE) rotation = toWorldRotation(rotation);',
+        '',
+        '        // Blend with the influence in comp space, like Blender does, so that',
+        '        // several of these effects can be stacked on the same layer.',
+        '        var influence = fx(' + p['Influence'].index + ').value / 100;',
+        '        ownerRotation += (rotation - ownerRotation) * influence;',
+        '        constrained = true;',
         '    }',
-        '    else {',
-        '        rotation = invert ? -targetRotation : targetRotation;',
-        '        if (mixMode != REPLACE) rotation += ownRotation;',
-        '    }',
         '',
-        '    // Back to comp space.',
-        '    if (ownerSpace == CUSTOM_SPACE && customSpace) rotation += customRotation;',
-        '    else if (ownerSpace == LOCAL_SPACE) rotation = toWorldRotation(rotation);',
+        '    if (!constrained) return value;',
+        '    return toLocalRotation(ownerRotation) - orientation;',
+        '}',
+    ];
+
+    var main;
+    if (axis == 2) main = threeD.concat(['']).concat(twoD).concat([
         '',
-        '    // Blend with the influence in comp space, like Blender does, so that',
-        '    // several of these effects can be stacked on the same layer.',
-        '    var influence = fx(' + p['Influence'].index + ').value / 100;',
-        '    ownerRotation += (rotation - ownerRotation) * influence;',
-        '    constrained = true;',
+        'var result;',
+        'if (is3D(thisLayer)) {',
+        '    result = value;',
+        '    var rotations = constrainedRotations();',
+        '    if (rotations) result = rotations[2];',
+        '}',
+        'else result = constrainedRotation();',
+        'result;'
+    ]);
+    else main = threeD.concat([
+        '',
+        '// Only a 3D layer turns around this axis.',
+        'var result = value;',
+        'if (is3D(thisLayer)) {',
+        '    var rotations = constrainedRotations();',
+        '    if (rotations) result = rotations[' + axis + '];',
+        '}',
+        'result;'
+    ]);
+
+    return [DuAEExpression.Id.COPY_ROTATION_CONSTRAINT,
+        DuAEExpression.Library.get(['checkDuikEffect', 'sign']),
+        Duik.Constraint.targetExpression(targets),
+        '',
+        '// The mix modes, in the order of the drop down of the effect.',
+        'var REPLACE = 1;',
+        'var ADD = 2;',
+        'var BEFORE_ORIGINAL = 3;',
+        'var AFTER_ORIGINAL = 4;',
+        'var OFFSET_LEGACY = 5;',
+        '',
+        '// The spaces, in the order of the drop downs of the effect.',
+        'var WORLD_SPACE = 1;',
+        'var CUSTOM_SPACE = 2;',
+        'var LOCAL_SPACE = 3;',
+        '',
+        '// Only 3D layers turn around X and Y.',
+        'function is3D(l) {',
+        '    return l.anchorPoint.value.length == 3;',
         '}',
         '',
-        'var result = value;',
-        'if (constrained) result = toLocalRotation(ownerRotation) - orientation;',
-        'result;',
+        main.join('\n'),
         ''
     ].join('\n');
 }
@@ -4448,11 +4902,13 @@ Duik.CmdLib['Constraint']["Copy Rotation"] = "Duik.Constraint.copyRotation()";
 /**
  * Adds a <i>copy rotation</i> constraint to the layers.<br />
  * This is an After Effects recreation of Blender's <i>Copy Rotation</i> constraint:
- * the rotation of the layer is combined with the rotation of a target layer, with a
- * choice of mix modes and spaces, and blended back with an influence.<br />
- * Like the rest of Duik, this works on the rotation around the Z axis, which is the
- * <i>Rotation</i> property of the layer (the orientation of 3D layers is taken into
- * account when reading the rotation of the layers, but is left untouched).<br />
+ * the rotation of the layer is combined with the rotation of a target layer, axis by axis
+ * in a choice of Euler orders, with a choice of mix modes and spaces, and blended back
+ * with an influence.<br />
+ * On a 2D layer, the constraint drives the <i>Rotation</i>, around Z, which is also the rotation
+ * of the layer itself. On a 3D layer, it drives the <i>X</i>, <i>Y</i> and <i>Z Rotation</i>, and
+ * the rotation of the layer itself is its <i>Orientation</i>, which the constraint leaves alone:
+ * a driven property can't be read back by the expressions driving the other two.<br />
  * The target is a layer of any composition of the project, picked in the Duik panel
  * and looked up by name; it can be changed later with {@link Duik.Constraint.setTarget}.<br />
  * Several of these effects can be added on the same layer; they're evaluated in
@@ -4478,9 +4934,10 @@ Duik.Constraint.copyRotation = function(comp, target, layers) {
         var effect = pe.apply(layer, name);
         effects.push(effect);
 
-        var targets = Duik.Constraint.bakedTargets(layer.rotation.expression);
+        var kind = Duik.Constraint.constraintKind(effect);
+        var targets = Duik.Constraint.constraintTargets(layer, kind);
         if (comp && target) targets[name] = [comp.name, target.name];
-        layer.rotation.expression = Duik.Constraint.copyRotationExpression(targets);
+        Duik.Constraint.writeExpressions(layer, kind, targets);
     });
 
     DuAEComp.selectLayers(layers);
@@ -4917,8 +5374,9 @@ Duik.Constraint.constraintKind = function(effect) {
         id: DuAEExpression.Id.COPY_LOCATION_CONSTRAINT,
         expression: Duik.Constraint.copyLocationExpression
     }, {
+        // A 3D layer is constrained around its three axis, a 2D one around Z only.
         pe: Duik.PseudoEffect.COPY_ROTATION,
-        properties: ['ADBE Rotate Z'],
+        properties: ['ADBE Rotate X', 'ADBE Rotate Y', 'ADBE Rotate Z'],
         id: DuAEExpression.Id.COPY_ROTATION_CONSTRAINT,
         expression: Duik.Constraint.copyRotationExpression
     }, {
@@ -4993,6 +5451,8 @@ Duik.Constraint.applyConstraint = function(layer, name) {
     for (var i = 0, n = kind.properties.length; i < n; i++) {
         var prop = layer.transform.property(kind.properties[i]);
         if (!prop) continue;
+        // A hidden property doesn't turn the layer: a 2D layer only turns around Z.
+        if (Duik.Constraint.isHiddenProperty(layer, kind.properties[i])) continue;
         // Separating the dimensions hides the position, and the other way round.
         if (prop.isSeparationLeader && prop.dimensionsSeparated) continue;
         if (prop.isSeparationFollower && !prop.separationLeader.dimensionsSeparated) continue;
@@ -5148,11 +5608,23 @@ Duik.Constraint.apply = function(effects) {
     // an applied constraint leaves its layer where it is at the current time.
     constraints.sort(function(a, b) { return a.index - b.index; });
 
+    // Removing an effect deselects its layer: keep the selection to restore it afterwards.
+    var selectedLayers = [];
+    var comps = {};
+    for (var i = 0, n = constraints.length; i < n; i++) {
+        var comp = constraints[i].layer.containingComp;
+        if (comps[comp.id]) continue;
+        comps[comp.id] = true;
+        selectedLayers = selectedLayers.concat(comp.selectedLayers);
+    }
+
     DuAE.beginUndoGroup( i18n._("Apply Constraint"), false);
 
     for (var i = 0, n = constraints.length; i < n; i++) {
         Duik.Constraint.applyConstraint(constraints[i].layer, constraints[i].name);
     }
+
+    DuAEComp.selectLayers(selectedLayers);
 
     DuAE.endUndoGroup( i18n._("Apply Constraint"));
 

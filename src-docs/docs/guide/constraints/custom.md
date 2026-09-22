@@ -58,12 +58,13 @@ A newly created constraint has no target and does nothing until you set one.
 
 ## ![](../../img/duik/icons/con_rotlike.svg){style="width:1em;"} Copy Rotation
 
-This is an After Effects version of [Blender's *Copy Rotation* constraint](https://docs.blender.org/manual/en/latest/animation/constraints/transform/copy_rotation.html), the companion of the [copy location constraint](#copy-location) above. Where the [orientation constraint](transform.md#orientation-constraint) adds a weighted share of the master layers' orientation, this one combines the rotation of the layer with the rotation of a single target using Blender's mix modes.
+This is an After Effects version of [Blender's *Copy Rotation* constraint](https://docs.blender.org/manual/en/latest/animation/constraints/transform/copy_rotation.html), the companion of the [copy location constraint](#copy-location) above. Where the [orientation constraint](transform.md#orientation-constraint) adds a weighted share of the master layers' orientation, this one combines the rotation of the layer with the rotation of a single target using Blender's mix modes, axis by axis, on 2D and 3D layers.
 
 Select the layers to constrain and click ![](../../img/duik/icons/con_rotlike.svg){style="width:1em;"} ***Copy Rotation***, then set its target in the ***Constraint settings***. The effect is named `Copy Rotation`, and `Copy Rotation.001`, `Copy Rotation.002`... for the next ones on the same layer.
 
 - **Target**: picked in the Duik panel, not in the effect — see [choosing the target](#choosing-the-target). It can be a layer of any composition of the project.
-- **Invert**: negates the copied rotation.
+- **Euler order**: the order in which the rotation is split into angles around **X**, **Y** and **Z**, which matters when only some axis are copied, or with the ***Add*** and ***Offset (Legacy)*** mix modes. ***Default*** is the order of After Effects, ***ZYX Euler***: a layer turns around Z first, then Y, then X.
+- **Axis**: check **X**, **Y** and **Z** to choose which axis are copied; the others keep the rotation of the layer. **Invert X**, **Invert Y** and **Invert Z** negate the copied angle.
 - **Mix mode**: how the copied rotation is combined with the layer's own rotation.
     - ***Replace*** discards the rotation of the layer and uses the target's.
     - ***Add*** adds the two rotations together.
@@ -77,15 +78,29 @@ You can duplicate the effect to stack several copy rotation constraints on the s
 !!! note
     The constraint is computed live by an expression: it doesn't need any keyframe, neither on the layer nor on its target, and updates as soon as anything moves.
 
+### 2D and 3D layers
+
+- On a **2D layer**, the constraint drives the *Rotation*, the only axis a 2D layer turns around. The *Rotation* is also the layer's own rotation, the one the constraint mixes with its target's. The **X** and **Y** options and the **Euler order** are ignored, and unchecking **Z** turns the constraint off.
+- On a **3D layer**, the constraint drives the *X*, *Y* and *Z Rotation*, all three of them, and the layer's own rotation — what Blender mixes with the target's — is its **Orientation**. So animate the *Orientation* to turn a constrained 3D layer by itself, with ***Add***, ***Before Original***, ***After Original*** or an axis left unchecked; the three *Rotation* properties hold the result of the constraint. With ***Replace*** and all three axis checked, the layer ends up turned exactly like its target, whatever its orientation.
+
 !!! tip
-    Negatively scaled parents are handled: a layer under a mirrored parent copies the rotation as seen on screen, and a vertically flipped parent turns it the right way up.
+    Negatively scaled parents are handled: a layer under a mirrored parent copies the rotation as seen on screen, and a vertically flipped parent turns it the right way up. This works the same way on 3D layers.
+
+!!! tip
+    Axis are the axis of After Effects, not of Blender: **Y** goes *down* the composition and **Z** goes *away* from the camera. The Euler orders are named after these axis too.
+
+!!! note
+    A layer can be switched between 2D and 3D with its constraint on: the same expressions work both ways. Only if a layer constrained while it was 2D doesn't turn around X and Y once it's 3D, set its target again in the ***Constraint settings***: After Effects sometimes refuses the expressions of properties it keeps hidden.
 
 ### Differences with Blender
 
-- **Only the Z axis.** After Effects drives each rotation axis as a separate property, and the whole rotation model of Duik works around the Z axis — the *Rotation* property of a layer, which is *Z Rotation* on a 3D layer. Blender's **Copy X**, **Copy Y** and **Copy Z** checkboxes are therefore not offered; unchecking Z would only disable the constraint, which the **Influence** does better. The *Orientation* of a 3D layer is read as part of its rotation, but is left untouched — the constraint writes to *Z Rotation* only.
-- Because rotations around a single axis add up, **Add**, **Before Original** and **After Original** give exactly the same result here. They're all listed anyway, so a rig ported from Blender can keep the mode it was built with. **Replace** and **Offset (Legacy)** do differ.
+- **The orientation of a 3D layer is its own rotation**, where Blender uses the whole rotation of the owner. After Effects splits the rotation of a 3D layer between its *Orientation* and its *X*, *Y* and *Z Rotation*. An expression only reads the value its own property had before it: a driven property can't be read back by the expressions driving the other two, or they'd wait for each other. The three rotations hold the result, so the orientation, which the constraint never touches, is what's left to hold the rotation of the layer itself.
+- On a 2D layer, rotations around a single axis add up, so **Add**, **Before Original** and **After Original** give exactly the same result. They're all listed anyway, so a rig ported from Blender can keep the mode it was built with. **Replace** and **Offset (Legacy)** do differ. On a 3D layer, they all differ, as in Blender.
 - There's no **Transform units** here: a rotation is an angle, so it carries over between compositions of any size unchanged.
-- The influence blends the two angles **linearly**, where Blender interpolates the rotation matrices and so always takes the shortest way round. Linear blending keeps the winding of the angle, which is what an After Effects rig needs — a wheel that has turned three times keeps its three turns instead of snapping back.
+- On a 2D layer, the influence blends the two angles **linearly**, where Blender interpolates the rotation matrices and so always takes the shortest way round. Linear blending keeps the winding of the angle, which is what an After Effects rig needs — a wheel that has turned three times keeps its three turns instead of snapping back. On a 3D layer, the influence takes the shortest way round, like Blender.
+- **No winding on 3D layers.** The angles a 3D layer gets are the smallest ones giving its rotation, between `-180` and `180` degrees: the three expressions each compute the whole rotation, and they have to pick the same angles to agree. A 2D layer keeps its turns, as above.
+- **Mirrors.** Blender reads a mirrored transformation as a rotation with a negative scale on all three axis. Duik reads it as seen on screen, as a rotation with its X axis flipped, on 2D and 3D layers alike. A **Custom space** layer only turns the rotations: whether it's mirrored or not doesn't change them.
+- **Skew.** When a parent is scaled unevenly and turned, the rotation is read along the layer's X axis, where Blender, built for bones, reads it along Y.
 
 ## ![](../../img/duik/icons/con_armature.svg){style="width:1em;"} Armature
 
@@ -118,4 +133,4 @@ The rest pose is stored relative to the **parent of the constrained layer**, whi
 - **The rest pose is taken** by Duik instead of being set in edit mode, and it's relative to the parent of the layer instead of an armature object — see [the rest pose](#the-rest-pose).
 - **In the plane of the composition.** Like the rest of Duik, the constraint works on the position, the *Z Rotation* and the *X* and *Y* scale of the layer. A 3D layer follows the depth of its target, but not its *X* and *Y* rotations.
 - **No skew.** When the target is scaled unevenly and turned, Blender's result is skewed, which a layer can't be. The layer's *X* axis goes where Blender puts it, its area is kept, and the skew is left out.
-- The influence blends the rotation **linearly**, where Blender always takes the shortest way round, so that a layer following a spinning target keeps its turns, as with the [copy rotation constraint](#copy-rotation).
+- The influence blends the rotation **linearly**, where Blender always takes the shortest way round, so that a layer following a spinning target keeps its turns, as the [copy rotation constraint](#copy-rotation) does on 2D layers.
