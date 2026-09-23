@@ -17,6 +17,7 @@ function buildConstraintsUI(tab, standAlone) {
         parentAcrossCompGroup.visible = false;
         constraintSettingsGroup.visible = false;
         armatureDeformGroup.visible = false;
+        poseShapeGroup.visible = false;
         pathConstraintGroup.visible = false;
         constraintsGroup.visible = false;
         propInfoGroup.visible = false;
@@ -1699,6 +1700,19 @@ function buildConstraintsUI(tab, standAlone) {
     );
     armatureDeformButton.onClick = function() { showArmatureDeform(); };
 
+    // Another modifier: it morphs the shape of paths between poses, following a layer.
+    var poseShapeButton = addNativeButton(
+        line2,
+        i18n._("Pose Shape Interpolator") + '...',
+        w16_blender_icon_shapekey_data,
+        i18n._("Morph Bézier paths between the shapes of poses laid out as points, " +
+                "following where a layer is among the points.\n\n" +
+                "Each Point Control of the pose points layer is a pose, and its shape is the path, " +
+                "or the group, of the same name in the target poses layer. " +
+                "The poses around the target position are blended smoothly.")
+    );
+    poseShapeButton.onClick = function() { showPoseShapeInterpolator(); };
+
     // The native versions of the auto-rig button and of the move anchor points and texture map
     // sub-panels, which other Duik panels build from utils.jsx.
 
@@ -2129,6 +2143,140 @@ function buildConstraintsUI(tab, standAlone) {
         hideAllGroups();
         armatureDeformGroup.visible = true;
         armatureDeformGroup.refresh();
+    }
+
+    // The pose shape interpolator modifier: its three layers are picked in the active composition.
+    // They're set in its effect, where they can be changed later on too.
+    var poseShapeGroup = addNativeGroup(mainGroup, 'column');
+    poseShapeGroup.visible = false;
+    poseShapeGroup.built = false;
+
+    function buildNativePoseShapeGroup( poseShapeGroup, mainGroup ) {
+        var titleBar = addNativeSubPanel(
+            poseShapeGroup,
+            i18n._("Pose shape interpolator"),
+            mainGroup
+        );
+
+        var layersSection = addNativeSection( poseShapeGroup, i18n._("Layers") );
+        // The same height as the lists of the constraint settings, which are slimmer by default.
+        layersSection.buttonHeight = 20;
+
+        // A list of the layers of the active composition, whose eyedropper picks the selected layer.
+        function addLayerList( label, helpTip ) {
+            layersSection.add('statictext', undefined, label + ':');
+            var list = addSearchList(
+                layersSection,
+                w12_layers,
+                i18n._("Pick the selected layer of the active composition."),
+                helpTip
+            );
+            list.pickButton.onClick = function() {
+                var layers = DuAEComp.getSelectedLayers();
+                if (layers.length > 0) listLayers(list, layers[0]);
+            };
+            return list;
+        }
+
+        var posePointsList = addLayerList(
+            i18n._("Pose Points Layer"),
+            i18n._("The layer holding a Point Control for each pose, named after the pose, " +
+                "and the path joining the points up.")
+        );
+        var targetPosesList = addLayerList(
+            i18n._("Target Poses Layer"),
+            i18n._("The shape layer holding the shape of each pose: a path, or a group, " +
+                "named exactly like its Point Control.")
+        );
+        var targetPositionList = addLayerList(
+            i18n._("Target Position Layer"),
+            i18n._("The layer whose position, in the composition, tells which poses to blend: " +
+                "the ones whose points are around it.")
+        );
+
+        // Lists the layers of the active composition, and selects one of them in a list,
+        // or keeps the one it has.
+        function listLayers( list, layer ) {
+            var comp = DuAEProject.getActiveComp();
+            var items = [];
+            if (comp) {
+                for (var i = 1, n = comp.numLayers; i <= n; i++)
+                    items.push({ name: i + ' | ' + comp.layer(i).name, key: i });
+            }
+            if (isdef(layer)) list.setItems(items, layer ? layer.index : 0);
+            else list.setItems(items, list.key);
+        }
+
+        function listedLayer( list ) {
+            var comp = DuAEProject.getActiveComp();
+            if (!comp || list.key < 1 || list.key > comp.numLayers) return null;
+            return comp.layer(list.key);
+        }
+
+        // Lists the layers again, and shows the ones the modifier of the selected path reads,
+        // the way the constraint settings show what a constraint points at.
+        poseShapeGroup.refresh = function() {
+            var settings = Duik.Modifier.getPoseShapeInterpolator();
+            if (!settings) {
+                listLayers(posePointsList);
+                listLayers(targetPosesList);
+                listLayers(targetPositionList);
+                return;
+            }
+            listLayers(posePointsList, settings.posePoints);
+            listLayers(targetPosesList, settings.targetPoses);
+            listLayers(targetPositionList, settings.targetPosition);
+        }
+
+        var refreshButton = titleBar.add(
+            'iconbutton',
+            undefined,
+            nativeImage(w12_blender_icon_file_refresh),
+            { style: 'button' }
+        );
+        refreshButton.helpTip = i18n._("Refresh") + "\n\n" +
+            i18n._("Show the layers the pose shape interpolator of the selected path reads, and update the lists of layers.");
+        refreshButton.alignment = ['left', 'center'];
+        refreshButton.onClick = function() { poseShapeGroup.refresh(); };
+
+        var validButton = addNativeValidButton(
+            poseShapeGroup,
+            i18n._("Pose shape interpolator"),
+            i18n._("Morph the selected paths between the poses.\n\n" +
+                    "The paths of a layer share one effect, where the layers can be changed later on. " +
+                    "A path which already has the modifier is set to read these layers instead.")
+        );
+        validButton.onClick = function() {
+            // The paths are the selected ones, the way the armature deform takes its paths.
+            var paths = DuAEComp.getSelectedProps(PropertyValueType.SHAPE);
+            if (paths.length == 0) {
+                alert(i18n._("Select the paths to deform first."));
+                return;
+            }
+
+            // A layer left to None stays as it is in the effect, to be set there.
+            Duik.Modifier.poseShapeInterpolator(
+                listedLayer(posePointsList),
+                listedLayer(targetPosesList),
+                listedLayer(targetPositionList),
+                paths
+            );
+
+            if (!titleBar.pinned) titleBar.onClose();
+        }
+
+        poseShapeGroup.built = true;
+        nativeLayout(poseShapeGroup);
+    }
+
+    function showPoseShapeInterpolator() {
+        if (!poseShapeGroup.built) {
+            buildNativePoseShapeGroup(poseShapeGroup, constraintsGroup);
+        }
+
+        hideAllGroups();
+        poseShapeGroup.visible = true;
+        poseShapeGroup.refresh();
     }
 
     var pathConstraintValidButton;

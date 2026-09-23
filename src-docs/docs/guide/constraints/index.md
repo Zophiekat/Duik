@@ -27,6 +27,7 @@ The top toolbar of the Links and Constraints panel contains a few useful tools r
 - [Transform Constraints](transform.md)
 - [Custom Constraints](custom.md)
 - [Armature Deform](armature-deform.md)
+- [Pose Shape Interpolator](pose-shape-interpolator.md)
 - Tools
     - [Add list](tools/list.md)
     - [Split values](tools/split.md)

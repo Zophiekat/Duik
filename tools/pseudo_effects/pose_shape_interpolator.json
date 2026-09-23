@@ -1,0 +1,82 @@
+{
+    "file": "pe_pose_shape_interpolator",
+    "controlName": "Pose Shape Interpolator",
+    "matchname": "Pseudo/DUIK poseShapeInterp v1",
+    "controlArray": [
+        {
+            "index": 0,
+            "name": "DUIK Data",
+            "parent": null,
+            "type": "group",
+            "container": null,
+            "invisible": true
+        },
+        {
+            "index": 0,
+            "name": "DUIK poseShapeInterp",
+            "hold": true,
+            "parent": null,
+            "type": "checkbox",
+            "keyframes": true,
+            "invisible": true,
+            "default": true,
+            "label": ""
+        },
+        {
+            "type": "endgroup"
+        },
+        {
+            "index": 1,
+            "name": "Pose Points Layer",
+            "parent": null,
+            "type": "layer",
+            "invisible": false,
+            "default": false
+        },
+        {
+            "index": 2,
+            "name": "Target Poses Layer",
+            "parent": null,
+            "type": "layer",
+            "invisible": false,
+            "default": false
+        },
+        {
+            "index": 3,
+            "name": "Target Position Layer",
+            "parent": null,
+            "type": "layer",
+            "invisible": false,
+            "default": false
+        },
+        {
+            "index": 4,
+            "name": "Interpolation",
+            "hold": true,
+            "parent": null,
+            "type": "popup",
+            "keyframes": false,
+            "invisible": false,
+            "default": 1,
+            "options": "Triangles|Smooth triangles|Nearest pose"
+        },
+        {
+            "index": 5,
+            "name": "Influence",
+            "hold": false,
+            "parent": null,
+            "type": "slider",
+            "keyframes": true,
+            "invisible": false,
+            "default": 100,
+            "smin": 0,
+            "smax": 100,
+            "vmin": 0,
+            "vmax": 100,
+            "precision": "1",
+            "percent": true,
+            "pixel": false,
+            "active": true
+        }
+    ]
+}
