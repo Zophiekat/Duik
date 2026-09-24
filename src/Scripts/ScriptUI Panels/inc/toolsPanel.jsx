@@ -37,28 +37,32 @@ function buildToolsPanelUI(tab) {
             compSettingsGroup.visible = false;
         }
 
-        var mainGroup = DuScriptUI.group(this, 'stacked');
+        var mainGroup = addNativeGroup(this, 'stack');
         mainGroup.alignment = ['fill', 'fill'];
 
-        var compGroup = DuScriptUI.group(mainGroup, 'column');
+        var compGroup = addNativeGroup(mainGroup, 'column');
 
-        var cropButton = DuScriptUI.button(
-            compGroup,
+        // A grid with a row per button, like the Links and constraints panel: its image, then the button.
+        var compGrid = addNativeButtonGrid(compGroup);
+        compGrid.buttonHeight = 24;
+
+        var cropButton = addNativeButton(
+            compGrid,
             i18n._("Crop precompositions"),
             w16_crop,
             i18n._("Crops the selected precompositions using the bounds of their masks.")
         );
         cropButton.onClick = Duik.Tool.cropPrecompositions;
 
-        var compSettingsButton = DuScriptUI.button( compGroup, {
-            text: i18n._("Comp settings") + '...',
-            image: w16_composition_settings,
-            helpTip: i18n._("Sets the current or selected composition(s) settings, also changing the settings of all precompositions."),
-            localize: false
-        });
+        var compSettingsButton = addNativeButton(
+            compGrid,
+            i18n._("Comp settings") + '...',
+            w16_composition_settings,
+            i18n._("Sets the current or selected composition(s) settings, also changing the settings of all precompositions.")
+        );
         compSettingsButton.onClick = function() {
             if (!compSettingsGroup.built) {
-                createSubPanel(
+                addNativeSubPanel(
                     compSettingsGroup,
                     i18n._("Comp settings"),
                     compGroup,
@@ -68,14 +72,14 @@ function buildToolsPanelUI(tab) {
                 #include "compSettingsPanel.jsx"
                 buildCompSettingsPanel( compSettingsGroup );
 
-                DuScriptUI.showUI(compSettingsGroup);
+                nativeLayout(compSettingsGroup);
             }
 
             hideAllGroups();
             compSettingsGroup.visible = true;
         };
 
-        var compSettingsGroup = DuScriptUI.group(mainGroup, 'column');
+        var compSettingsGroup = addNativeGroup(mainGroup, 'column');
         compSettingsGroup.visible = false;
         compSettingsGroup.built = false;
     };
@@ -87,17 +91,21 @@ function buildToolsPanelUI(tab) {
             replaceGroup.visible = false;
         }
 
-        var mainGroup = DuScriptUI.group(this, 'stacked');
+        var mainGroup = addNativeGroup(this, 'stack');
         mainGroup.alignment = ['fill', 'fill'];
 
-        var textGroup = DuScriptUI.group(mainGroup, 'column');
+        var textGroup = addNativeGroup(mainGroup, 'column');
 
-        var renameButton = DuScriptUI.button( textGroup, {
-            text: i18n._("Rename") + '...',
-            helpTip: i18n._("Renames the selected items (layers, pins, project items...)"),
-            image: w16_rename,
-            localize: false
-        });
+        // A grid with a row per button, like the Links and constraints panel: its image, then the button.
+        var textGrid = addNativeButtonGrid(textGroup);
+        textGrid.buttonHeight = 24;
+
+        var renameButton = addNativeButton(
+            textGrid,
+            i18n._("Rename") + '...',
+            w16_rename,
+            i18n._("Renames the selected items (layers, pins, project items...)")
+        );
         renameButton.onClick = function() {
             if (!renameGroup.built) {
 
@@ -132,86 +140,57 @@ function buildToolsPanelUI(tab) {
                     return newName;
                 }
 
-                createSubPanel(
+                addNativeSubPanel(
                     renameGroup,
                     i18n._("Rename"),
                     textGroup,
                     false
                 );
 
-                var itemSelector = DuScriptUI.selector(renameGroup);
-                itemSelector.addButton({ text: i18n._("Layers"), image: w16_layers });
-                itemSelector.addButton({ text: i18n._("Puppet pins"), image: w16_pin });
-                itemSelector.addButton({ text: i18n._("Project items"), image: w16_items });
-                itemSelector.setCurrentIndex(0);
+                var itemSelector = addNativeDropdown(renameGroup, [
+                    [i18n._("Layers"), w16_layers],
+                    [i18n._("Puppet pins"), w16_pin],
+                    [i18n._("Project items"), w16_items]
+                ], 0);
 
-                var expButton = DuScriptUI.checkBox(renameGroup, {
-                    text: i18n._("Update expressions"),
-                    image: w16_update_expression,
-                    helpTip: i18n._("Automatically updates the expressions.")
-                });
-                expButton.setChecked(true);
+                var expButton = addNativeCheckBox(
+                    renameGroup,
+                    i18n._("Update expressions"),
+                    w16_update_expression,
+                    i18n._("Automatically updates the expressions."),
+                    true
+                );
 
-                var removeFGroup = addSetting( renameGroup, i18n._("Remove the first digits"));
-                var removeFEdit = DuScriptUI.editText( removeFGroup, {
-                    text: '001',
-                    suffix: ' ' + i18n._("digits") + '.',
-                    localize: false
-                });
+                var removeFGroup = addNativeSetting( renameGroup, i18n._("Remove the first digits"));
+                var removeFEdit = addNativeEditText( removeFGroup, '001', ' ' + i18n._("digits") + '.' );
 
-                var removeLGroup = addSetting( renameGroup, i18n._("Remove the last digits"));
-                var removeLEdit = DuScriptUI.editText( removeLGroup, {
-                    text: '001',
-                    suffix: ' ' + i18n._("digits") + '.',
-                    localize: false
-                });
+                var removeLGroup = addNativeSetting( renameGroup, i18n._("Remove the last digits"));
+                var removeLEdit = addNativeEditText( removeLGroup, '001', ' ' + i18n._("digits") + '.' );
 
-                var numberGroup = addSetting( renameGroup, i18n._("Number from"));
-                var numberEditGroup = DuScriptUI.group(numberGroup, 'row');
-                numberEditGroup.alignment = ['fill', 'top'];
-                var numberEdit = DuScriptUI.editText( numberEditGroup, {
-                    text: '001'
-                });
-                numberEdit.alignment = ['fill', 'fill'];
-                var numberReverseBox = DuScriptUI.checkBox( numberEditGroup, {
-                    text: i18n._("Reverse"), /// TRANSLATORS: as in "reverse numbering / reverse order"
-                    helpTip: i18n._("Number from last to first.")
-                });
-                numberReverseBox.alignment = ['right', 'center'];
+                var numberGroup = addNativeSetting( renameGroup, i18n._("Number from"));
+                var numberEdit = addNativeEditText( numberGroup, '001' );
+                var numberReverseBox = addNativeCheckBox(
+                    numberGroup,
+                    i18n._("Reverse"), /// TRANSLATORS: as in "reverse numbering / reverse order"
+                    null,
+                    i18n._("Number from last to first.")
+                );
+                numberReverseBox.parent.alignment = ['right', 'center'];
 
-                var newNameGroup = DuScriptUI.group(renameGroup, 'row');
+                // Native fields have no place holder, so the parts of the new name have labels instead.
+                var newNameForm = addNativeForm(renameGroup);
+                var prefixEdit = newNameForm.addField(i18n._("Prefix") + ':', 'edittext', '')[1];
+                var nameEdit = newNameForm.addField(i18n._("Name") + ':', 'edittext', '')[1];
+                var suffixEdit = newNameForm.addField(i18n._("Suffix") + ':', 'edittext', '')[1];
 
-                var prefixEdit = DuScriptUI.editText( newNameGroup, {
-                    text: '',
-                    placeHolder: i18n._("Prefix") + '_',
-                    localize: false
-                });
-                prefixEdit.alignment = ['fill', 'fill'];
-
-                var nameEdit = DuScriptUI.editText( newNameGroup, {
-                    text: '',
-                    placeHolder: i18n._("Name")
-                });
-                nameEdit.alignment = ['fill', 'fill'];
-
-                var suffixEdit = DuScriptUI.editText( newNameGroup, {
-                    text: '',
-                    placeHolder: '_' + i18n._("Suffix"),
-                    localize: false
-                });
-                suffixEdit.alignment = ['fill', 'fill'];
-
-                var validButton = DuScriptUI.button( renameGroup, {
-                    text: i18n._("Rename"),
-                    image: w16_rename,
-                    helpTip: i18n._("Renames the selected items (layers, pins, project items...)"),
-                    orientation: 'row',
-                    alignment: 'center'
-                });
-                validButton.alignment = ['fill', 'top'];
+                var validButton = addNativeValidButton(
+                    renameGroup,
+                    i18n._("Rename"),
+                    i18n._("Renames the selected items (layers, pins, project items...)")
+                );
                 validButton.onClick = function() {
                     // Layers
-                    if (itemSelector.index == 0) {
+                    if (itemSelector.selection.index == 0) {
                         var comp = DuAEProject.getActiveComp();
                         if (!comp) return;
                         var layers = comp.selectedLayers;
@@ -224,18 +203,18 @@ function buildToolsPanelUI(tab) {
                         layers.do(function (layer) {
                             var oldName = layer.name;
                             var i = layers.current;
-                            if ( numberReverseBox.checked) i = layers.length() - i - 1;
+                            if ( numberReverseBox.value) i = layers.length() - i - 1;
                             var newName = generateNewName(oldName, i);
 
                             layer.name = newName;
-                            if (expButton.checked) app.project.autoFixExpressions(oldName,newName);
+                            if (expButton.value) app.project.autoFixExpressions(oldName,newName);
                         });
 
                         app.endSuppressDialogs(false);
                         DuAE.endUndoGroup();
                     }
                     // Pins
-                    else if (itemSelector.index == 1) {
+                    else if (itemSelector.selection.index == 1) {
                         var props = DuAEComp.getSelectedProps('ADBE FreePin3 PosPin Atom');
                         if (props.length == 0) {
                             // Try to find puppet pins on the first selected layer, if single
@@ -264,10 +243,10 @@ function buildToolsPanelUI(tab) {
                         props.do(function(prop) {
                             var oldName = prop.getProperty().name;
                             var i = props.current;
-                            if ( numberReverseBox.checked) i = props.length() - i - 1;
+                            if ( numberReverseBox.value) i = props.length() - i - 1;
                             var newName = generateNewName(oldName,i);
                             prop.getProperty().name = newName;
-                            if (expButton.checked) app.project.autoFixExpressions(oldName,newName);
+                            if (expButton.value) app.project.autoFixExpressions(oldName,newName);
                         });
 
                         app.endSuppressDialogs(false);
@@ -286,10 +265,10 @@ function buildToolsPanelUI(tab) {
                         {
                             var oldName = item.name;
                             var i = items.current;
-                            if ( numberReverseBox.checked) i = items.length() - i - 1;
+                            if ( numberReverseBox.value) i = items.length() - i - 1;
                             var newName = generateNewName(oldName,i);
                             item.name = newName;
-                            if (expButton.checked) app.project.autoFixExpressions(oldName,newName);
+                            if (expButton.value) app.project.autoFixExpressions(oldName,newName);
                         });
 
                         app.endSuppressDialogs(false);
@@ -297,125 +276,97 @@ function buildToolsPanelUI(tab) {
                     }
                 };
 
-                DuScriptUI.showUI(renameGroup);
+                nativeLayout(renameGroup);
             }
             hideAllGroups();
             renameGroup.visible = true;
         };
 
-        var replaceButton = DuScriptUI.button( textGroup, {
-            text: i18n._("Search and replace") + '...',
-            helpTip: i18n._("Searches and replaces text in the project."),
-            image: w16_search_replace,
-            localize: false
-        });
+        var replaceButton = addNativeButton(
+            textGrid,
+            i18n._("Search and replace") + '...',
+            w16_search_replace,
+            i18n._("Searches and replaces text in the project.")
+        );
         replaceButton.onClick = function() {
             if (!replaceGroup.built) {
-                createSubPanel(
+                addNativeSubPanel(
                     replaceGroup,
                     i18n._("Search and replace"),
                     textGroup,
                     false
                 );
 
-                var itemSelector = DuScriptUI.selector(replaceGroup);
-                itemSelector.addButton({ text: i18n._("Expressions"), image: w16_expression });
-                itemSelector.addButton({ text: i18n._("Texts"), image: w16_text });
-                itemSelector.addButton({ text: i18n._("Effects"), image: w16_fx });
-                itemSelector.addButton({ text: i18n._("Layers"), image: w16_layers });
-                itemSelector.addButton({ text: i18n._("Project items"), image: w16_items });
-                itemSelector.setCurrentIndex(0);
+                var itemSelector = addNativeDropdown(replaceGroup, [
+                    [i18n._("Expressions"), w16_expression],
+                    [i18n._("Texts"), w16_text],
+                    [i18n._("Effects"), w16_fx],
+                    [i18n._("Layers"), w16_layers],
+                    [i18n._("Project items"), w16_items]
+                ], 0);
                 itemSelector.onChange = function() {
-                    expButton.visible = itemSelector.index == 2 || itemSelector.index == 3 || itemSelector.index == 4;
-                    compItemGroup.visible = itemSelector.index != 4;
+                    if (!itemSelector.selection) return;
+                    var index = itemSelector.selection.index;
+                    // The whole row of the checkbox, with its image.
+                    expButton.parent.visible = index == 2 || index == 3 || index == 4;
+                    compItemGroup.visible = index != 4;
                     projectItemsGroup.visible = !compItemGroup.visible;
                 };
 
-                var itemMainGroup = DuScriptUI.group( replaceGroup, 'stacked');
+                var itemMainGroup = addNativeGroup( replaceGroup, 'stack');
+                itemMainGroup.alignment = ['fill', 'top'];
 
-                var compItemGroup = DuScriptUI.group(itemMainGroup, 'column');
-                
-                var compSelector = DuScriptUI.selector( compItemGroup );
-                compSelector.addButton({ text: i18n._("Active composition"), image: w16_composition });
-                compSelector.addButton({ text: i18n._("All Compositions"), image: w16_compositions });
-                compSelector.setCurrentIndex(0);
+                var compItemGroup = addNativeGroup(itemMainGroup, 'column');
+
+                var compSelector = addNativeDropdown( compItemGroup, [
+                    [i18n._("Active composition"), w16_composition],
+                    [i18n._("All Compositions"), w16_compositions]
+                ], 0);
                 compSelector.onChange = function() {
-                    layerSelector.visible = compSelector.index == 0;
+                    if (!compSelector.selection) return;
+                    layerSelector.visible = compSelector.selection.index == 0;
                 };
 
-                var layerSelector = DuScriptUI.selector( compItemGroup );
-                layerSelector.addButton({ text: i18n._("Selected layers"), image: w16_selected_layers});
-                layerSelector.addButton({ text: i18n._("All layers"), image: w16_layers});
-                layerSelector.setCurrentIndex(1);
+                var layerSelector = addNativeDropdown( compItemGroup, [
+                    [i18n._("Selected layers"), w16_selected_layers],
+                    [i18n._("All layers"), w16_layers]
+                ], 1);
 
-                var projectItemsGroup = DuScriptUI.group( itemMainGroup, 'column');
+                var projectItemsGroup = addNativeGroup( itemMainGroup, 'column');
                 projectItemsGroup.visible = false;
 
-                var itemTypeGroup = DuScriptUI.group( projectItemsGroup, 'row' );
+                var itemTypeGroup = addNativeGroup( projectItemsGroup, 'row' );
 
-                var compButton = DuScriptUI.checkBox( itemTypeGroup, {
-                    text: '',
-                    image: w16_composition,
-                    helpTip: i18n._("Compositions")
-                });
-                compButton.alignment = ['left', 'top'];
-                compButton.setChecked(true);
+                var compButton = addNativeCheckBox( itemTypeGroup, '', w16_composition, i18n._("Compositions"), true );
+                var footageButton = addNativeCheckBox( itemTypeGroup, '', w16_footage, i18n._("Footages"), true );
+                var folderButton = addNativeCheckBox( itemTypeGroup, '', w16_folder, i18n._("Folders"), true );
 
-                var footageButton = DuScriptUI.checkBox( itemTypeGroup, {
-                    text: '',
-                    image: w16_footage,
-                    helpTip: i18n._("Footages")
-                });
-                footageButton.alignment = ['left', 'top'];
-                footageButton.setChecked(true);
+                var projectIemsSelector = addNativeDropdown( projectItemsGroup, [
+                    [i18n._("All items"), w16_items],
+                    [i18n._("Selected items"), w16_selected_items]
+                ], 0);
 
-                var folderButton = DuScriptUI.checkBox( itemTypeGroup, {
-                    text: '',
-                    image: w16_folder,
-                    helpTip: i18n._("Folders")
-                });
-                folderButton.alignment = ['left', 'top'];
-                folderButton.setChecked(true);
+                var caseButton = addNativeCheckBox( replaceGroup, i18n._("Case sensitive"), w16_case, '', true );
 
-                var projectIemsSelector = DuScriptUI.selector( projectItemsGroup );
-                projectIemsSelector.addButton({ text: i18n._("All items"), image: w16_items });
-                projectIemsSelector.addButton({ text: i18n._("Selected items"), image: w16_selected_items });
-                projectIemsSelector.setCurrentIndex(0);
+                var expButton = addNativeCheckBox(
+                    replaceGroup,
+                    i18n._("Update expressions"),
+                    w16_update_expression,
+                    i18n._("Automatically updates the expressions."),
+                    true
+                );
+                expButton.parent.visible = false;
 
-                var caseButton = DuScriptUI.checkBox( replaceGroup, {
-                    text: i18n._("Case sensitive"),
-                    image: w16_case
-                });
-                caseButton.setChecked(true);
+                // Native fields have no place holder, so they have labels instead.
+                var replaceForm = addNativeForm(replaceGroup);
+                var searchEdit = replaceForm.addField(i18n._("Search") + ':', 'edittext', '')[1];
+                var replaceEdit = replaceForm.addField(i18n._("Replace") + ':', 'edittext', '')[1];
 
-                var expButton = DuScriptUI.checkBox(replaceGroup, {
-                    text: i18n._("Update expressions"),
-                    image: w16_update_expression,
-                    helpTip: i18n._("Automatically updates the expressions.")
-                });
-                expButton.setChecked(true);
-                expButton.visible = false;
-
-                var searchEdit = DuScriptUI.editText( replaceGroup, {
-                    text: '',
-                    placeHolder: i18n._("Search")
-                });
-                searchEdit.alignment = ['fill', 'top'];
-
-                var replaceEdit = DuScriptUI.editText( replaceGroup, {
-                    text: '',
-                    placeHolder: i18n._("Replace")
-                });
-                replaceEdit.alignment = ['fill', 'top'];
-
-                var validButton = DuScriptUI.button( replaceGroup, {
-                    text: i18n._("Search and replace"),
-                    image: w16_search_replace,
-                    helpTip: i18n._("Search and replace text in the project."),
-                    orientation: 'row',
-                    alignment: 'center'
-                });
-                validButton.alignment = ['fill', 'top'];
+                var validButton = addNativeValidButton(
+                    replaceGroup,
+                    i18n._("Search and replace"),
+                    i18n._("Search and replace text in the project.")
+                );
                 validButton.onClick = function() {
                     var search = searchEdit.text;
                     var replace = replaceEdit.text;
@@ -425,20 +376,20 @@ function buildToolsPanelUI(tab) {
                     app.beginSuppressDialogs();
 
                     // Expressions
-                    if (itemSelector.index == 0) {
+                    if (itemSelector.selection.index == 0) {
                         // All comps
-                        if (compSelector.index == 1) {
-                            DuAEProject.replaceInExpressions( search, replace, caseButton.checked );
+                        if (compSelector.selection.index == 1) {
+                            DuAEProject.replaceInExpressions( search, replace, caseButton.value );
                         }
                         // Active comp
                         else {
-                            DuAEComp.replaceInExpressions( search, replace, caseButton.checked, layerSelector.index == 0 )
+                            DuAEComp.replaceInExpressions( search, replace, caseButton.value, layerSelector.selection.index == 0 )
                         }
                     }
                     // Texts
-                    else if (itemSelector.index == 1) {
+                    else if (itemSelector.selection.index == 1) {
                         // All comps
-                        if (compSelector.index == 1) {
+                        if (compSelector.selection.index == 1) {
                             var items = new DuList(app.project.items);
                             items.do(function(item) {
                                 if (!(item instanceof CompItem)) return;
@@ -447,7 +398,7 @@ function buildToolsPanelUI(tab) {
                                     if (layer.locked) return;
                                     if (!(layer instanceof TextLayer)) return;
                                     var source = layer.sourceText.value;
-                                    source.text = DuString.replace( source.text, search, replace, caseButton.checked);
+                                    source.text = DuString.replace( source.text, search, replace, caseButton.value);
                                     layer.sourceText.setValue(source);
                                 });
                             });
@@ -457,23 +408,23 @@ function buildToolsPanelUI(tab) {
                             var comp = DuAEProject.getActiveComp();
                             if (comp) {
                                 var layers = [];
-                                if (layerSelector.index == 0) layers = comp.selectedLayers;
+                                if (layerSelector.selection.index == 0) layers = comp.selectedLayers;
                                 else layers = comp.layers;
                                 layers = new DuList(layers);
                                 layers.do(function(layer) {
                                     if (layer.locked) return;
                                     if (!(layer instanceof TextLayer)) return;
                                     var source = layer.sourceText.value;
-                                    source.text = DuString.replace( source.text, search, replace, caseButton.checked);
+                                    source.text = DuString.replace( source.text, search, replace, caseButton.value);
                                     layer.sourceText.setValue(source);
                                 });
                             }
                         }
                     }
                     // Effects
-                    else if (itemSelector.index == 2) {
+                    else if (itemSelector.selection.index == 2) {
                         // All comps
-                        if (compSelector.index == 1) {
+                        if (compSelector.selection.index == 1) {
                             var items = new DuList(app.project.items);
                             items.do(function (comp) {
                                 if (!(comp instanceof CompItem)) return;
@@ -482,8 +433,8 @@ function buildToolsPanelUI(tab) {
                                     if (layer.locked) return;
                                     for (var i = 1, n = layer.property('ADBE Effect Parade').numProperties; i <= n; i++) {
                                         var oldName = layer.effect(i).name;
-                                        layer.effect(i).name = DuString.replace(oldName, search, replace, caseButton.checked);
-                                        if (expButton.checked) app.project.autoFixExpressions(oldName,layer.effect(i).name);
+                                        layer.effect(i).name = DuString.replace(oldName, search, replace, caseButton.value);
+                                        if (expButton.value) app.project.autoFixExpressions(oldName,layer.effect(i).name);
                                     }
                                 });
                             });
@@ -493,24 +444,24 @@ function buildToolsPanelUI(tab) {
                             var comp = DuAEProject.getActiveComp();
                             if (comp) {
                                 var layers = [];
-                                if (layerSelector.index == 0) layers = comp.selectedLayers;
+                                if (layerSelector.selection.index == 0) layers = comp.selectedLayers;
                                 else layers = comp.layers;
                                 layers = new DuList(layers);
                                 layers.do(function(layer) {
                                     if (layer.locked) return;
                                     for (var i = 1, n = layer.property('ADBE Effect Parade').numProperties; i <= n; i++) {
                                         var oldName = layer.effect(i).name;
-                                        layer.effect(i).name = DuString.replace(oldName, search, replace, caseButton.checked);
-                                        if (expButton.checked) app.project.autoFixExpressions(oldName,layer.effect(i).name);
+                                        layer.effect(i).name = DuString.replace(oldName, search, replace, caseButton.value);
+                                        if (expButton.value) app.project.autoFixExpressions(oldName,layer.effect(i).name);
                                     }
                                 });
                             }
                         }
                     }
                     // Layers
-                    else if (itemSelector.index == 3) {
+                    else if (itemSelector.selection.index == 3) {
                         // All comps
-                        if (compSelector.index == 1) {
+                        if (compSelector.selection.index == 1) {
                             var items = new DuList(app.project.items);
                             items.do(function (comp) {
                                 if (!(comp instanceof CompItem)) return;
@@ -518,8 +469,8 @@ function buildToolsPanelUI(tab) {
                                 layers.do(function(layer) {
                                     if (layer.locked) return;
                                     var oldName = layer.name;
-                                    layer.name = DuString.replace(oldName, search, replace, caseButton.checked);
-                                    if (expButton.checked) app.project.autoFixExpressions(oldName,layer.name);
+                                    layer.name = DuString.replace(oldName, search, replace, caseButton.value);
+                                    if (expButton.value) app.project.autoFixExpressions(oldName,layer.name);
                                 });
                             });
                         }
@@ -528,33 +479,33 @@ function buildToolsPanelUI(tab) {
                             var comp = DuAEProject.getActiveComp();
                             if (comp) {
                                 var layers = [];
-                                if (layerSelector.index == 0) layers = comp.selectedLayers;
+                                if (layerSelector.selection.index == 0) layers = comp.selectedLayers;
                                 else layers = comp.layers;
                                 layers = new DuList(layers);
                                 layers.do(function(layer) {
                                     if (layer.locked) return;
                                     var oldName = layer.name;
-                                    layer.name = DuString.replace(oldName, search, replace, caseButton.checked);
-                                    if (expButton.checked) app.project.autoFixExpressions(oldName,layer.name);
+                                    layer.name = DuString.replace(oldName, search, replace, caseButton.value);
+                                    if (expButton.value) app.project.autoFixExpressions(oldName,layer.name);
                                 });
                             }
                         }
                     }
                     // Items
-                    else if (itemSelector.index == 4) {
+                    else if (itemSelector.selection.index == 4) {
                         var items = [];
-                        if (projectIemsSelector.index == 0) items = app.project.items;
+                        if (projectIemsSelector.selection.index == 0) items = app.project.items;
                         else items = app.project.selection;
                         items = new DuList(items);
                         
                         items.do(function(item) {
-                            if (item instanceof CompItem && !compButton.checked) return;
-                            if (item instanceof FolderItem && !folderButton.checked) return;
-                            if (item instanceof FootageItem && !footageButton.checked) return;
+                            if (item instanceof CompItem && !compButton.value) return;
+                            if (item instanceof FolderItem && !folderButton.value) return;
+                            if (item instanceof FootageItem && !footageButton.value) return;
 
                             var oldName = item.name;
-                            item.name = DuString.replace(oldName, search, replace, caseButton.checked);
-                            if (expButton.checked) app.project.autoFixExpressions(oldName,item.name);
+                            item.name = DuString.replace(oldName, search, replace, caseButton.value);
+                            if (expButton.value) app.project.autoFixExpressions(oldName,item.name);
                         });
                     }
 
@@ -563,17 +514,17 @@ function buildToolsPanelUI(tab) {
                     DuAE.endUndoGroup();
                 };
 
-                DuScriptUI.showUI(replaceGroup);
+                nativeLayout(replaceGroup);
             }
             hideAllGroups();
             replaceGroup.visible = true;
         };
 
-        var renameGroup = DuScriptUI.group(mainGroup, 'column');
+        var renameGroup = addNativeGroup(mainGroup, 'column');
         renameGroup.visible = false;
         renameGroup.built = false;
 
-        var replaceGroup = DuScriptUI.group(mainGroup, 'column');
+        var replaceGroup = addNativeGroup(mainGroup, 'column');
         replaceGroup.visible = false;
         replaceGroup.built = false;
     }
@@ -587,20 +538,24 @@ function buildToolsPanelUI(tab) {
             devGroup.visible = false;
         }
 
-        var mainGroup = DuScriptUI.group(this, 'stacked');
+        var mainGroup = addNativeGroup(this, 'stack');
         mainGroup.alignment = ['fill', 'fill'];
 
-        var devGroup = DuScriptUI.group(mainGroup, 'column');
+        var devGroup = addNativeGroup(mainGroup, 'column');
 
-        var scriptLibButton = DuScriptUI.button(
-            devGroup,
+        // A grid with a row per button, like the Links and constraints panel: its options and image, then the button.
+        var devGrid = addNativeButtonGrid(devGroup);
+        devGrid.buttonHeight = 24;
+
+        var scriptLibButton = addNativeButton(
+            devGrid,
             i18n._("Script library") + '...',
             w16_library,
             i18n._("Quickly access and run all your scripts and panels.")
         );
         scriptLibButton.onClick = function() {
             if (!scriptLibGroup.built) {
-                createSubPanel(
+                addNativeSubPanel(
                     scriptLibGroup,
                     i18n._("Script library"),
                     devGroup,
@@ -610,15 +565,15 @@ function buildToolsPanelUI(tab) {
                 #include "scriptLibPanel.jsx"
                 buildScriptLibPanel( scriptLibGroup, scriptEditorGroup );
 
-                DuScriptUI.showUI(scriptLibGroup);
+                nativeLayout(scriptLibGroup);
             }
 
             hideAllGroups();
             scriptLibGroup.visible = true;
         };
 
-        var scriptifyButton = DuScriptUI.button(
-            devGroup,
+        var scriptifyButton = addNativeButton(
+            devGrid,
             i18n._("Scriptify expression"),
             w16_scriptify_expression,
             i18n._("Generate a handy ExtendScript code to easily include the selected expression into a script.")
@@ -626,7 +581,7 @@ function buildToolsPanelUI(tab) {
         scriptifyButton.onClick = function() {
             if (!scriptifyGroup.built) {
 
-                createSubPanel(
+                addNativeSubPanel(
                     scriptifyGroup,
                     i18n._("Scriptify expression"),
                     devGroup,
@@ -638,18 +593,15 @@ function buildToolsPanelUI(tab) {
                 });
                 scriptifyGroup.edit.alignment = ['fill', 'fill'];
 
-                DuScriptUI.separator( scriptifyGroup ).alignment = ['fill', 'bottom'];
+                addNativeSeparator( scriptifyGroup ).alignment = ['fill', 'bottom'];
 
-                var validButton = DuScriptUI.button(
+                var validButton = addNativeButton(
                     scriptifyGroup,
                     i18n._("Scriptify expression"),
                     w16_scriptify_expression,
-                    i18n._("Generate a handy ExtendScript code to easily include the selected expression into a script."),
-                    false,
-                    'row',
-                    'center'
+                    i18n._("Generate a handy ExtendScript code to easily include the selected expression into a script.")
                 );
-                validButton.alignment = ['center', 'bottom'];
+                validButton.alignment = ['fill', 'bottom'];
                 validButton.onClick = function() {
                     var props = DuAEComp.getSelectedProps();
                     if (props.length == 0) return;
@@ -660,7 +612,7 @@ function buildToolsPanelUI(tab) {
                 scriptifyGroup.refresh = validButton.onClick;
 
                 scriptifyGroup.built = true;
-                DuScriptUI.showUI(scriptifyGroup);
+                nativeLayout(scriptifyGroup);
             }
 
             scriptifyGroup.refresh();
@@ -668,15 +620,15 @@ function buildToolsPanelUI(tab) {
             scriptifyGroup.visible = true;
         };
 
-        var scriptEditorButton = DuScriptUI.button(
-            devGroup,
+        var scriptEditorButton = addNativeButton(
+            devGrid,
             i18n._("Script editor"),
             w16_script,
             i18n._("A quick editor for editing and running simple scripts and snippets.")
         );
         scriptEditorButton.onClick = function() {
             if (!scriptEditorGroup.built) {
-                createSubPanel(
+                addNativeSubPanel(
                     scriptEditorGroup,
                     i18n._("Script editor"),
                     devGroup,
@@ -690,16 +642,16 @@ function buildToolsPanelUI(tab) {
             scriptEditorGroup.visible = true;
         }
 
-        var editExpressionButton = DuScriptUI.button(
-            devGroup,
+        var editExpressionButton = addNativeButton(
+            devGrid,
             i18n._("Edit expression"),
             w16_expression_file,
             i18n._( "Use an external editor to edit the selected expression.\n\n[Ctrl]: Reloads the expressions from the external editor."),
-            true
+            { options: true }
         );
         editExpressionButton.optionsPopup.build = function() {
 
-            var editorSelector = DuScriptUI.fileSelector(
+            var editorSelector = addNativeFileSelector(
                 editExpressionButton.optionsPanel,
                 i18n._("Open expressions with..."),
                 true,
@@ -729,15 +681,15 @@ function buildToolsPanelUI(tab) {
             };
         };
 
-        var scriptifyGroup = DuScriptUI.group(mainGroup, 'column');
+        var scriptifyGroup = addNativeGroup(mainGroup, 'column');
         scriptifyGroup.visible = false;
         scriptifyGroup.built = false;
 
-        var scriptLibGroup = DuScriptUI.group(mainGroup, 'column');
+        var scriptLibGroup = addNativeGroup(mainGroup, 'column');
         scriptLibGroup.visible = false;
         scriptLibGroup.built = false;
 
-        var scriptEditorGroup = DuScriptUI.group(mainGroup, 'column');
+        var scriptEditorGroup = addNativeGroup(mainGroup, 'column');
         scriptEditorGroup.visible = false;
         scriptEditorGroup.built = false;
         scriptEditorGroup.edit = function( content ) {

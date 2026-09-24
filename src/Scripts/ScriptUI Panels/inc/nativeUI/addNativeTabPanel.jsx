@@ -1,17 +1,25 @@
 /**
  * Adds a tab panel: a row of toggle buttons over a stack of tabs, the native version of
  * <code>DuScriptUI.tabPanel</code>.<br />
- * A tab is built the first time it's shown, by its <code>build</code> callback, and only once the
- * UI is shown, which keeps the panel quick to open. Tabs are registered with
- * <code>DuScriptUI.allTabs</code>, so <code>DuScriptUI.showUI</code> builds the visible ones.
- * @param {Group|Panel|Window} container - Where to add the tab panel.
+ * Every tab is built by its <code>build</code> callback before the UI is shown, by {@link nativeBuildTabs}
+ * in <i>ui_show.jsx</i>, so that switching to a tab never waits for it to be built; the whole UI is then
+ * laid out once. A tab which failed to build is built again when it's shown. Tabs are registered with
+ * <code>DuScriptUI.allTabs</code> too, so <code>DuScriptUI.showUI</code> shows the visible ones.<br />
+ * The row of buttons and the stack are added straight to the container, without a group around them,
+ * and each tab skips the layouts at an unchanged size ({@link nativeCacheLayout}): every level of groups
+ * doubles the time ScriptUI takes to lay the UI out.
+ * @param {Group|Panel|Window} container - Where to add the tab panel: a column.
  * @param {string} [tabOrientation='row'] - Kept for the signature of DuScriptUI.tabPanel.
- * @return {Group} The tab panel. Add tabs with <code>addTab(text, image, helpTip)</code>, show one
- * with <code>setCurrentIndex(index)</code>, and read the shown one from <code>index</code>.
+ * @return {Group} The tab panel: the stack of tabs, which is also its <code>mainGroup</code>, with the row
+ * of buttons above it in <code>buttonsGroup</code>. Add tabs with <code>addTab(text, image, helpTip)</code>,
+ * show one with <code>setCurrentIndex(index)</code>, and read the shown one from <code>index</code>.
  * Its <code>onChange</code> runs whenever the tab changes.
  */
 function addNativeTabPanel(container, tabOrientation) {
-    var panel = addNativeGroup(container, 'column');
+    var buttonsGroup = addNativeGroup(container, 'row');
+    buttonsGroup.alignment = ['fill', 'top'];
+
+    var panel = addNativeGroup(container, 'stack');
     panel.alignment = ['fill', 'fill'];
     panel.tabOrientation = def(tabOrientation, 'row');
     panel.buttons = [];
@@ -19,9 +27,8 @@ function addNativeTabPanel(container, tabOrientation) {
     panel.index = -1;
     panel.onChange = function() {};
 
-    panel.buttonsGroup = addNativeGroup(panel, 'row');
-    panel.mainGroup = addNativeGroup(panel, 'stack');
-    panel.mainGroup.alignment = ['fill', 'fill'];
+    panel.buttonsGroup = buttonsGroup;
+    panel.mainGroup = panel;
 
     panel.addTab = function(text, image, helpTip, translatable) {
         text = def(text, '');
@@ -62,6 +69,7 @@ function addNativeTabPanel(container, tabOrientation) {
 
         var tab = addNativeGroup(panel.mainGroup, 'column');
         tab.alignment = ['fill', 'fill'];
+        nativeCacheLayout(tab);
         tab.visible = false;
         tab.activated = false;
         tab.built = false;
@@ -75,12 +83,14 @@ function addNativeTabPanel(container, tabOrientation) {
         tab.duBuild = function() {
             if (tab.built) return;
             tab.build(tab);
+            // Before the UI is shown, this does nothing: it's laid out once as a whole by DuScriptUI.showUI.
             nativeLayout(tab);
             tab.built = true;
         };
 
         panel.tabs.push(tab);
         DuScriptUI.allTabs.push(tab);
+        nativeTabs.push(tab);
 
         button.onClick = function() {
             if (nativeModifiers().alt) {
@@ -104,7 +114,7 @@ function addNativeTabPanel(container, tabOrientation) {
         for (var i = 0; i < numTabs; i++) {
             var tab = panel.tabs[i];
             tab.activated = i == index;
-            // Built only once the UI is shown: DuScriptUI.showUI builds the tab which starts visible.
+            // Tabs are built before the UI is shown; DuScriptUI.showUI shows the one which starts visible.
             if (tab.activated && DuScriptUI.uiShown) {
                 tab.duBuild();
                 tab.visible = true;
@@ -124,4 +134,22 @@ function addNativeTabPanel(container, tabOrientation) {
     };
 
     return panel;
+}
+
+/**
+ * Builds all the tabs of the native tab panels which aren't built yet, including the ones added by
+ * the tabs being built, like the tabs of the Tools panel. Called once, right before the UI is shown,
+ * so that the whole UI is built at launch and laid out in one go.<br />
+ * A tab which fails to build is reported, and doesn't keep the other ones from being built.
+ */
+function nativeBuildTabs() {
+    // The list grows while the tabs are built.
+    for (var i = 0; i < nativeTabs.length; i++) {
+        var tab = nativeTabs[i];
+        if (tab.built) continue;
+        DuDebug.safeRun(tab.duBuild);
+        // Icon-only tabs have no name: their help tip starts with it.
+        if (typeof logStartupStep === 'function')
+            logStartupStep("Tab built: " + (tab.name != '' ? tab.name : tab.button.helpTip.split('\n')[0]));
+    }
 }

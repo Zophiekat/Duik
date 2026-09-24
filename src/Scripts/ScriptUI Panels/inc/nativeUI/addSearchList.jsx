@@ -155,5 +155,10 @@ function addSearchList(container, image, pickTip, helpTip, height) {
         searchList.select(key);
     }
 
+    // Enables or disables the list and its eyedropper.
+    searchList.enable = function(enabled) {
+        group.enabled = enabled;
+    }
+
     return searchList;
 }

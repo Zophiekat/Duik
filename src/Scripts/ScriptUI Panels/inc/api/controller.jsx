@@ -55,7 +55,8 @@ Duik.Controller.Type = {
     AUDIO: 39,
     VERTEBRAE: 40,
     TORSO: 41,
-    AE_NULL: 42
+    AE_NULL: 42,
+    BEZIER_POINT: 43
 }
 
 /**
@@ -265,6 +266,9 @@ Duik.Controller.aeInit = function() {
         i18n._p("controller_shape", "vertebrae"),
         i18n._p("controller_shape", "spine")
         ];
+    Duik.Controller.Name[Duik.Controller.Type.BEZIER_POINT] = [
+        i18n._p("controller_shape", "bezier point")
+    ];
     Duik.Controller.Name[Duik.Controller.Type.TORSO] = [
         i18n._p("controller_shape", "torso"),
         i18n._p("controller_shape", "lungs"),
@@ -340,6 +344,7 @@ Duik.CmdLib[ 'Controller' ][ "Spine" ] = "Duik.Controller.fromLayers( Duik.Contr
 Duik.CmdLib[ 'Controller' ][ "Shoulders" ] = "Duik.Controller.fromLayers( Duik.Controller.Type.SHOULDERS )";
 Duik.CmdLib[ 'Controller' ][ "Tail" ] = "Duik.Controller.fromLayers( Duik.Controller.Type.TAIL )";
 Duik.CmdLib[ 'Controller' ][ "Null" ] = "Duik.Controller.fromLayers( Duik.Controller.Type.NULL )";
+Duik.CmdLib[ 'Controller' ][ "Bezier Point" ] = "Duik.Controller.fromLayers( Duik.Controller.Type.BEZIER_POINT )";
 
 /**
  * Creates an controller in the current comp on selected layers.
@@ -417,7 +422,8 @@ Duik.Controller.create = function ( comp, type, layer, parent ) {
 
     // Adjust mode and type
     // Sliders must be shape layers (for now)
-    if (type == Duik.Controller.Type.SLIDER || type == Duik.Controller.Type.DOUBLE_SLIDER || type == Duik.Controller.Type.ANGLE) {
+    // and so must Bezier points, which draw their handles.
+    if (type == Duik.Controller.Type.SLIDER || type == Duik.Controller.Type.DOUBLE_SLIDER || type == Duik.Controller.Type.ANGLE || type == Duik.Controller.Type.BEZIER_POINT) {
         mode = Duik.Controller.LayerMode.SHAPE;
     }
     // If mode is null, type must be AE Null
@@ -803,6 +809,13 @@ Duik.Controller.create = function ( comp, type, layer, parent ) {
         return ctrl;
     }
 
+    // The Bezier point is the controller, its handles are built around it
+    if ( type == Duik.Controller.Type.BEZIER_POINT ) {
+        if ( !layer ) Duik.Layer.setAttributes( ctrl, Duik.Layer.Type.CONTROLLER, i18n._( "Point" ) );
+        Duik.Controller.buildBezierPoint( ctrl, layer != null );
+        return ctrl;
+    }
+
     // Null and raster are ready
     if ( type == Duik.Controller.Type.NULL || type == Duik.Controller.Type.AE_NULL ||  mode == 3) {
         if ( !layer ) Duik.Layer.setAttributes( ctrl, Duik.Layer.Type.CONTROLLER, i18n._( "Null" ) );
@@ -930,6 +943,152 @@ Duik.Controller.create = function ( comp, type, layer, parent ) {
     }
 
     return ctrl;
+}
+
+/**
+ * Builds a Bezier point controller from a new controller layer, which becomes the Point.<br />
+ * The Point draws a 16-vertex Bezier circle, its first (top) vertex moved up.<br />
+ * Two handle controllers are added on the X axis of the Point, each parented to it through a zero:
+ * the Handle Left on +X and the Handle Right on -X.
+ * Each one draws a circle, and a line from the Point to the edge of the circle.<br />
+ * Low-level method used by {@link Duik.Controller.create}.
+ * @param {ShapeLayer} point - The new controller layer, already named and positioned.
+ * @param {boolean} [namedAfterLayer=false] - Whether the Point is named after a layer; the handles are then named after it too.
+ * @return {ShapeLayer[]} The handles: the Handle Left and the Handle Right.
+ */
+Duik.Controller.buildBezierPoint = function ( point, namedAfterLayer ) {
+    namedAfterLayer = def( namedAfterLayer, false );
+    var comp = point.containingComp;
+
+    var pointSize = 60;
+    var pointVertices = 16;
+    // How far up the top vertex of the Point is moved
+    var pointTopOffset = 20;
+    var handleSize = 40;
+    // The distance between the Point and its handles
+    var handleOffset = 100;
+
+    // Adds a Stroke, then a Fill at half opacity
+    function addPaint( content, strokeColor, strokeWidth, fillColor ) {
+        var stroke = content.addProperty( "ADBE Vector Graphic - Stroke" );
+        stroke( "ADBE Vector Stroke Color" ).setValue( DuColor.fromHex( strokeColor ).floatRGBA() );
+        stroke( "ADBE Vector Stroke Opacity" ).setValue( 100 );
+        stroke( "ADBE Vector Stroke Width" ).setValue( strokeWidth );
+        var fill = content.addProperty( "ADBE Vector Graphic - Fill" );
+        fill( "ADBE Vector Fill Color" ).setValue( DuColor.fromHex( fillColor ).floatRGBA() );
+        fill( "ADBE Vector Fill Opacity" ).setValue( 50 );
+    }
+
+    // --- POINT ---
+
+    // A circle as a Bezier path, clockwise from its top vertex (Y points down),
+    // then that vertex is moved up.
+    var r = pointSize / 2;
+    // The tangents of a circle drawn with n vertices, relative to its radius: 4/3 * tan(PI / 2n)
+    var k = r * 4 / 3 * Math.tan( Math.PI / ( 2 * pointVertices ) );
+    var circleShape = new Shape();
+    var vertices = [];
+    var inTangents = [];
+    var outTangents = [];
+    for ( var i = 0; i < pointVertices; i++ ) {
+        var a = -Math.PI / 2 + i * 2 * Math.PI / pointVertices;
+        var cos = Math.cos( a );
+        var sin = Math.sin( a );
+        vertices.push( [ r * cos, r * sin ] );
+        inTangents.push( [ k * sin, -k * cos ] );
+        outTangents.push( [ -k * sin, k * cos ] );
+    }
+    vertices[0][1] -= pointTopOffset;
+    circleShape.vertices = vertices;
+    circleShape.inTangents = inTangents;
+    circleShape.outTangents = outTangents;
+    circleShape.closed = true;
+
+    var pointContent = point( "ADBE Root Vectors Group" );
+    var pointPath = pointContent.addProperty( "ADBE Vector Shape - Group" );
+    pointPath.name = 'Point';
+    pointPath( "ADBE Vector Shape" ).setValue( circleShape );
+    addPaint( pointContent, '4988FF', 6, '396EF6' );
+
+    // --- HANDLES ---
+
+    var side = Duik.Layer.side( point );
+    var location = Duik.Layer.location( point );
+    var groupName = Duik.Layer.groupName( point );
+    var baseName = namedAfterLayer ? Duik.Layer.name( point ) + ' ' : '';
+
+    // The handles find the Point by its name
+    var lineExp = [
+        '// Duik Bezier Point: a line from the Point to this handle',
+        'var point = thisComp.layer("' + point.name + '");',
+        'var start = fromComp( point.toComp( point.transform.anchorPoint ) );',
+        'var end = thisLayer.transform.anchorPoint;',
+        'createPath( [ [ start[0], start[1] ], [ end[0], end[1] ] ], [], [], false );'
+    ].join( '\n' );
+    var circleExp = [
+        '// Duik Bezier Point: the circle stays on this handle',
+        'var a = thisLayer.transform.anchorPoint;',
+        '[ a[0], a[1] ];'
+    ].join( '\n' );
+
+    // The handles and their zeros are stacked under the Point
+    var bottomLayer = point;
+
+    // direction: 1 for +X, -1 for -X
+    function addHandle( name, direction ) {
+        var handle = comp.layers.addShape();
+        handle.moveAfter( bottomLayer );
+        handle.selected = false;
+        DuAETag.setValue( handle, DuAETag.Key.DUIK_CONTROLLER_TYPE, Duik.Controller.Type.BEZIER_POINT );
+        DuAELayer.lockScale( handle );
+        Duik.Layer.setAttributes( handle, Duik.Layer.Type.CONTROLLER, name, side, location, groupName );
+
+        // On the X axis of the Point
+        handle.parent = point;
+        var a = point.transform.anchorPoint.value;
+        handle.transform.position.setValue( [ a[0] + direction * handleOffset, a[1] ] );
+
+        var content = handle( "ADBE Root Vectors Group" );
+
+        // Drawn where the expression puts it, in case the expression is disabled
+        var lineShape = new Shape();
+        lineShape.vertices = [ [ -direction * handleOffset, 0 ], [ 0, 0 ] ];
+        lineShape.inTangents = [ [ 0, 0 ], [ 0, 0 ] ];
+        lineShape.outTangents = [ [ 0, 0 ], [ 0, 0 ] ];
+        lineShape.closed = false;
+        var line = content.addProperty( "ADBE Vector Shape - Group" );
+        line.name = 'Line';
+        line( "ADBE Vector Shape" ).setValue( lineShape );
+        line( "ADBE Vector Shape" ).expression = lineExp;
+
+        var circle = content.addProperty( "ADBE Vector Shape - Ellipse" );
+        circle.name = 'Circle';
+        circle( "ADBE Vector Ellipse Size" ).setValue( [ handleSize, handleSize ] );
+        circle( "ADBE Vector Ellipse Position" ).expression = circleExp;
+
+        // Cuts the Line where it enters the Circle. The merge consumes the Circle,
+        // so an instance of it, linked to it, draws it again.
+        var merge = content.addProperty( "ADBE Vector Filter - Merge" );
+        merge( "ADBE Vector Merge Type" ).setValue( 3 ); // Subtract
+
+        var circleInstance = content.addProperty( "ADBE Vector Shape - Ellipse" );
+        circleInstance.name = 'Circle Instance';
+        circleInstance( "ADBE Vector Ellipse Size" ).setValue( [ handleSize, handleSize ] );
+        circleInstance( "ADBE Vector Ellipse Size" ).expression = 'content("Circle").size';
+        circleInstance( "ADBE Vector Ellipse Position" ).expression = 'content("Circle").position';
+
+        addPaint( content, '61C3FF', 4, '53A2E5' );
+
+        // Parented to the Point through a zero
+        bottomLayer = Duik.Constraint.zero( handle, true )[0];
+
+        return handle;
+    }
+
+    return [
+        addHandle( baseName + i18n._( "Handle Left" ), 1 ),
+        addHandle( baseName + i18n._( "Handle Right" ), -1 )
+    ];
 }
 
 /**

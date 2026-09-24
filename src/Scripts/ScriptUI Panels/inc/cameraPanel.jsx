@@ -10,11 +10,19 @@ function buildCameraPanelUI( tab, standAlone )
         spacer.size = [-1,3];
 
         // A title
-        DuScriptUI.staticText( tab, i18n._("Cameras") ).alignment = ['center', 'top'];
+        tab.add('statictext', undefined, i18n._("Cameras")).alignment = ['center', 'top'];
     }
 
-    // tools
-    var toolsGroup = DuScriptUI.toolBar( tab );
+    // The panel is a row, like the Links and constraints panel: the tool bar on the left, then the buttons.
+    var contentGroup = addNativeGroup(tab, 'row');
+    contentGroup.alignment = ['fill', 'fill'];
+    contentGroup.alignChildren = ['fill', 'fill'];
+    // Room on each side of the separator, so the tool bar and the buttons don't hug it.
+    contentGroup.spacing = 8;
+
+    // tools: two per row, down the left of the panel
+    var toolsGroup = addNativeToolBar(contentGroup, 2, 32, 32);
+    toolsGroup.alignment = ['left', 'top'];
 
     // DuFrame
     var frameButton = toolsGroup.addButton(
@@ -36,15 +44,19 @@ function buildCameraPanelUI( tab, standAlone )
         else if (result == -1) alert( i18n._("Nothing selected. Please select a layer first."));
     }
 
-    // A Spacer
-    var spacer = tab.add('group');
-    spacer.margins = 0;
-    spacer.spacing = 0;
-    spacer.size = [-1,3];
+    // Between the tool bar and the buttons.
+    addNativeSeparator(contentGroup, 'vertical');
+
+    var cameraGroup = addNativeGroup(contentGroup, 'column');
+    cameraGroup.alignment = ['fill', 'fill'];
+
+    // A grid with a row per button, like the Links and constraints panel: its image, then the button.
+    var line1 = addNativeButtonGrid(cameraGroup);
+    line1.buttonHeight = 24;
 
     // Camera Rig
-    var cameraRigButton = DuScriptUI.button(
-        tab,
+    var cameraRigButton = addNativeButton(
+        line1,
         i18n._("Camera Rig"),
         w16_camera_rig,
         i18n._("Rig the selected camera to make it easier to animate.\nAlso includes nice behaviors like handheld camera or shoulder camera...")
@@ -55,8 +67,8 @@ function buildCameraPanelUI( tab, standAlone )
     }
 
     // 2D Camera
-    var twoDCameraButton = DuScriptUI.button(
-        tab,
+    var twoDCameraButton = addNativeButton(
+        line1,
         i18n._("2D Camera"),
         w16_2d_camera,
         i18n._("Create a fake camera, working with standard multiplane 2D Layers.\nParent the layers to the control null objects.\nDuplicate these control nulls if you need more levels.\nThis also includes nice behaviors like handheld camera or shoulder camera...")

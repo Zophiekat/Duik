@@ -3940,7 +3940,8 @@ Duik.Constraint.uniqueEffectName = function(layer, baseName) {
  * Reads back the targets written in the expression of the constraints of a property.
  * @private
  * @param {string} expression The expression.
- * @return {Object} The targets, as <code>{ effectName: [compName, layerName] }</code>.
+ * @return {Object} The targets, as <code>{ effectName: [compName, layerName] }</code>, and
+ * <code>[compName, layerName, pathAddress]</code> for the point constraints.
  */
 Duik.Constraint.bakedTargets = function(expression) {
     if (!expression) return {};
@@ -3966,9 +3967,12 @@ Duik.Constraint.expressionString = function(s) {
  * An expression has no access to the project: it can't list its compositions, and
  * <code>comp()</code> only takes a name. There's no text parameter in an After
  * Effects effect either, so the target can't be stored in the effect and is written
- * in the expression itself, keyed by the name of the effect.
+ * in the expression itself, keyed by the name of the effect.<br />
+ * The point constraints also write the address of their path in the target layer, as
+ * {@link Duik.Constraint.pathAddress} gives it.
  * @private
- * @param {Object} [targets] The targets, as <code>{ effectName: [compName, layerName] }</code>.
+ * @param {Object} [targets] The targets, as <code>{ effectName: [compName, layerName] }</code>, and
+ * <code>[compName, layerName, pathAddress]</code> for the point constraints.
  * @return {string} The expression.
  */
 Duik.Constraint.targetExpression = function(targets) {
@@ -3980,14 +3984,16 @@ Duik.Constraint.targetExpression = function(targets) {
     for (var name in targets) {
         var t = targets[name];
         if (!t) continue;
-        entries.push(quote(name) + ':[' + quote(t[0]) + ',' + quote(t[1]) + ']');
+        var path = t[2] ? ',' + Duik.Constraint.pathAddressLiteral(t[2]) : '';
+        entries.push(quote(name) + ':[' + quote(t[0]) + ',' + quote(t[1]) + path + ']');
     }
 
     return [
         '// The target of each constraint, as [ composition name, layer name ], written',
         '// here by Duik: an expression can\'t list the compositions of the project, and',
         '// an After Effects effect has no text parameter to hold a name. The key is the',
-        '// name of the effect, so don\'t rename the constraints.',
+        '// name of the effect, so don\'t rename the constraints. A point constraint adds',
+        '// the address of its path in the layer.',
         'var DUIK_TARGETS = {' + entries.join(',') + '};',
         '',
         'function targetOf(fx) {',
@@ -4006,15 +4012,275 @@ Duik.Constraint.targetExpression = function(targets) {
 }
 
 /**
+ * The address of a Bezier path in its layer: the keys leading to it from the layer, the way an
+ * expression reads them, as in <code>layer("ADBE Root Vectors Group")("Group 1")...</code>.<br />
+ * A property with a fixed name is found by its match name, which doesn't change with the language
+ * of After Effects. A shape group, a path or a mask is found by its name, or by its index when
+ * another one of its group has the same name, since an expression only finds the first one.
+ * @param {PropertyBase|DuAEProperty} path - The path property, or the shape path or mask holding it.
+ * @return {Array.<string|int>|null} The address, or null if this isn't a Bezier path.
+ */
+Duik.Constraint.pathAddress = function(path) {
+    path = new DuAEProperty(path).pathProperty();
+    if (!path) return null;
+
+    var address = [];
+    var prop = path.getProperty();
+    // The layer is the only property without a parent.
+    while (prop.parentProperty) {
+        var group = prop.parentProperty;
+        var key = prop.matchName;
+        if (prop.propertyDepth > 1 && group.propertyType == PropertyType.INDEXED_GROUP) {
+            key = prop.name;
+            for (var i = 1, n = group.numProperties; i <= n; i++) {
+                if (i == prop.propertyIndex || group.property(i).name != prop.name) continue;
+                key = prop.propertyIndex;
+                break;
+            }
+        }
+        address.unshift(key);
+        prop = group;
+    }
+    return address;
+}
+
+/**
+ * Writes the address of a path as an array literal, to use in an expression.
+ * @private
+ * @param {Array.<string|int>} address The address, as {@link Duik.Constraint.pathAddress} gives it.
+ * @return {string} The literal.
+ */
+Duik.Constraint.pathAddressLiteral = function(address) {
+    var keys = [];
+    for (var i = 0, n = address.length; i < n; i++) {
+        var key = address[i];
+        keys.push(typeof key === 'number' ? key : Duik.Constraint.expressionString(key));
+    }
+    return '[' + keys.join(',') + ']';
+}
+
+/**
+ * Finds a Bezier path in a layer by its address.
+ * @param {Layer} layer - The layer.
+ * @param {Array.<string|int>} address - The address, as {@link Duik.Constraint.pathAddress} gives it.
+ * @return {Property|null} The path property, or null if the layer has no path at this address.
+ */
+Duik.Constraint.pathAtAddress = function(layer, address) {
+    if (!layer || !address) return null;
+    var prop = layer;
+    for (var i = 0, n = address.length; i < n; i++) {
+        try { prop = prop.property(address[i]); }
+        catch (e) { return null; }
+        if (!prop) return null;
+    }
+    if (prop.propertyType != PropertyType.PROPERTY) return null;
+    if (prop.propertyValueType != PropertyValueType.SHAPE) return null;
+    return prop;
+}
+
+/**
+ * Lists the Bezier paths of a layer a point constraint can target: the paths of its shapes, whatever
+ * group they're in, and its masks.
+ * @param {Layer} layer - The layer.
+ * @return {Object[]} The paths, as <code>{ name, address }</code>: where the path is, like
+ * <code>Contents / Group 1 / Path 1</code> or <code>Masks / Mask 1</code>, and its address, as
+ * {@link Duik.Constraint.pathAddress} gives it.
+ */
+Duik.Constraint.listPaths = function(layer) {
+    var paths = [];
+
+    function walk(group, name) {
+        for (var i = 1, n = group.numProperties; i <= n; i++) {
+            var prop = group.property(i);
+            if (prop.matchName == 'ADBE Vector Shape - Group' || prop.matchName == 'ADBE Mask Atom')
+                paths.push({ name: name + ' / ' + prop.name, address: Duik.Constraint.pathAddress(prop) });
+            else if (prop.matchName == 'ADBE Vector Group')
+                walk(prop.property('ADBE Vectors Group'), name + ' / ' + prop.name);
+        }
+    }
+
+    var groups = ['ADBE Root Vectors Group', 'ADBE Mask Parade'];
+    for (var i = 0, n = groups.length; i < n; i++) {
+        var group = null;
+        // Cameras and lights have neither contents nor masks.
+        try { group = layer.property(groups[i]); }
+        catch (e) {}
+        if (group) walk(group, group.name);
+    }
+
+    return paths;
+}
+
+/**
+ * Writes the indices of some parameters of a pseudo effect as an object literal, to use in an
+ * expression reading effects which don't have their parameters in the same order.
+ * @private
+ * @param {DuAEPseudoEffect} pe The pseudo effect.
+ * @param {Object} names The names of the parameters, by the key to use in the expression.
+ * @return {string} The object literal.
+ */
+Duik.Constraint.paramIndices = function(pe, names) {
+    var entries = [];
+    for (var key in names) entries.push(key + ': ' + pe.props[names[key]].index);
+    return '{ ' + entries.join(', ') + ' }';
+}
+
+/**
+ * The functions the expressions of the point constraints read the vertex of a path with.
+ * They need <code>DUIK_TARGETS</code>, from {@link Duik.Constraint.targetExpression}.
+ * @private
+ * @return {string} The functions.
+ */
+Duik.Constraint.pointFunctions = function() {
+    return [
+        '// The sides of a vertex, in the order of the drop downs of the point constraints.',
+        'var HANDLE_LEFT = 2;',
+        'var HANDLE_RIGHT = 3;',
+        '',
+        '// 2D affine transformations, as [ [a, b, x], [c, d, y] ]: the rows of a matrix',
+        '// turning column vectors, and the translation added afterwards.',
+        'function affine(m, v) {',
+        '    return [ m[0][0] * v[0] + m[0][1] * v[1] + m[0][2], m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] ];',
+        '}',
+        '// The transformation doing b, then a.',
+        'function composeAffine(a, b) {',
+        '    return [',
+        '        [ a[0][0] * b[0][0] + a[0][1] * b[1][0], a[0][0] * b[0][1] + a[0][1] * b[1][1], a[0][0] * b[0][2] + a[0][1] * b[1][2] + a[0][2] ],',
+        '        [ a[1][0] * b[0][0] + a[1][1] * b[1][0], a[1][0] * b[0][1] + a[1][1] * b[1][1], a[1][0] * b[0][2] + a[1][1] * b[1][2] + a[1][2] ]',
+        '    ];',
+        '}',
+        'function rotationAffine(angle) {',
+        '    var c = Math.cos(angle);',
+        '    var s = Math.sin(angle);',
+        '    return [ [c, -s, 0], [s, c, 0] ];',
+        '}',
+        '',
+        '// What a shape group does to its contents, the way After Effects does it: around the anchor',
+        '// point, it scales them, skews them along the skew axis, turns them, then moves them.',
+        'function groupAffine(g) {',
+        '    var a = g("ADBE Vector Anchor").value;',
+        '    var p = g("ADBE Vector Position").value;',
+        '    var s = g("ADBE Vector Scale").value;',
+        '    var skew = degreesToRadians( g("ADBE Vector Skew").value );',
+        '    var skewAxis = degreesToRadians( g("ADBE Vector Skew Axis").value );',
+        '    var m = [ [1, 0, -a[0]], [0, 1, -a[1]] ];',
+        '    m = composeAffine( [ [s[0] / 100, 0, 0], [0, s[1] / 100, 0] ], m );',
+        '    m = composeAffine( rotationAffine(skewAxis), m );',
+        '    m = composeAffine( [ [1, -Math.tan(skew), 0], [0, 1, 0] ], m );',
+        '    m = composeAffine( rotationAffine(-skewAxis), m );',
+        '    m = composeAffine( rotationAffine( degreesToRadians( g("ADBE Vector Rotation").value ) ), m );',
+        '    return composeAffine( [ [1, 0, p[0]], [0, 1, p[1]] ], m );',
+        '}',
+        '',
+        '// The path a point constraint reads, found in the target layer by the address written after',
+        '// the name of the layer in DUIK_TARGETS, and what takes its points to the space of the layer:',
+        '// the shape groups holding the path. null when the layer has no path at this address.',
+        'function targetPath(fx, l) {',
+        '    var address = DUIK_TARGETS[fx.name][2];',
+        '    if (!address) return null;',
+        '    try {',
+        '        var p = l;',
+        '        var m = [ [1, 0, 0], [0, 1, 0] ];',
+        '        for (var k = 0; k < address.length; k++) {',
+        '            // The contents of a shape group come after the group itself, which moves them.',
+        '            if (address[k] == "ADBE Vectors Group") m = composeAffine( m, groupAffine( p("ADBE Vector Transform Group") ) );',
+        '            p = p(address[k]);',
+        '        }',
+        '        return { path: p, matrix: m };',
+        '    }',
+        '    catch (e) { return null; }',
+        '}',
+        '',
+        '// The vertex of a path at an index, in the space of its layer: its point, its two handles,',
+        '// and the ends of the segments on each side, null at the ends of an open path. The index is',
+        '// rounded, wraps around a closed path and stops at the ends of an open one.',
+        '// null when the path has no vertex.',
+        'function vertexAt(tp, index) {',
+        '    var pts = tp.path.points();',
+        '    var n = pts.length;',
+        '    if (n == 0) return null;',
+        '    var inT = tp.path.inTangents();',
+        '    var outT = tp.path.outTangents();',
+        '    var closed = tp.path.isClosed();',
+        '',
+        '    var i = Math.round(index);',
+        '    if (closed) i = ((i % n) + n) % n;',
+        '    else i = Math.min( Math.max(i, 0), n - 1 );',
+        '',
+        '    // The point of a vertex, or one of its handles.',
+        '    function at(k, tangents) {',
+        '        var v = pts[k];',
+        '        if (tangents) v = [ v[0] + tangents[k][0], v[1] + tangents[k][1] ];',
+        '        return affine(tp.matrix, v);',
+        '    }',
+        '',
+        '    var vertex = { point: at(i), left: at(i, inT), right: at(i, outT), previous: null, next: null };',
+        '    if (closed || i > 0) {',
+        '        var j = (i + n - 1) % n;',
+        '        vertex.previous = { point: at(j), right: at(j, outT) };',
+        '    }',
+        '    if (closed || i < n - 1) {',
+        '        var k = (i + 1) % n;',
+        '        vertex.next = { point: at(k), left: at(k, inT) };',
+        '    }',
+        '    return vertex;',
+        '}',
+        '',
+        '// The vertex a point constraint reads on its target layer, or null.',
+        'function targetVertex(fx, indexParam, l) {',
+        '    var tp = targetPath(fx, l);',
+        '    if (!tp) return null;',
+        '    return vertexAt(tp, fx(indexParam).value);',
+        '}',
+        '',
+        '// The first of some vectors which has a length, at unit length, or null.',
+        'function firstDirection(vectors) {',
+        '    for (var k = 0; k < vectors.length; k++) {',
+        '        var d = vectors[k];',
+        '        var l = Math.sqrt(d[0] * d[0] + d[1] * d[1]);',
+        '        if (l > 1e-6) return [ d[0] / l, d[1] / l ];',
+        '    }',
+        '    return null;',
+        '}',
+        'function towards(a, b) {',
+        '    return [ b[0] - a[0], b[1] - a[1] ];',
+        '}',
+        '',
+        '// The tangent of the path at a vertex, the way the path goes, at unit length, in the space of',
+        '// its layer: on the side of the left handle, of the right handle, or the average of both.',
+        '// A retracted handle gives no direction, and the segment then leaves the vertex toward',
+        '// the next control point. null when the path goes nowhere from the vertex.',
+        'function vertexTangent(v, side) {',
+        '    // The path comes from the previous vertex through the left handle...',
+        '    var incoming = null;',
+        '    if (v.previous) incoming = firstDirection([ towards(v.left, v.point), towards(v.previous.right, v.point), towards(v.previous.point, v.point) ]);',
+        '    // ...and leaves to the next one through the right handle.',
+        '    var outgoing = null;',
+        '    if (v.next) outgoing = firstDirection([ towards(v.point, v.right), towards(v.point, v.next.left), towards(v.point, v.next.point) ]);',
+        '',
+        '    if (side == HANDLE_LEFT) return incoming || outgoing;',
+        '    if (side == HANDLE_RIGHT) return outgoing || incoming;',
+        '    if (!incoming) return outgoing;',
+        '    if (!outgoing) return incoming;',
+        '    // Where the path turns back on itself, the two sides cancel out: keep the way out.',
+        '    return firstDirection([ [ incoming[0] + outgoing[0], incoming[1] + outgoing[1] ] ]) || outgoing;',
+        '}'
+    ].join('\n');
+}
+
+/**
  * Writes the target of the constraints of a layer whose target is set in Duik: the copy location,
- * copy rotation and armature constraints.
+ * copy rotation, copy point location, copy point rotation and armature constraints.
  * @private
  * @param {Layer} layer - The constrained layer.
  * @param {string} compName - The name of the composition holding the target.
  * @param {string} layerName - The name of the target layer.
  * @param {string[]} [only] - The names of the effects to retarget; all of them if omitted.
+ * @param {Array.<string|int>|null} [path] - The address of the path the point constraints target, as
+ * {@link Duik.Constraint.pathAddress} gives it. Ignored by the other constraints. When omitted, the point
+ * constraints keep the address they had, and find the path at the same place in the new target layer.
  */
-Duik.Constraint.writeTarget = function(layer, compName, layerName, only) {
+Duik.Constraint.writeTarget = function(layer, compName, layerName, only, path) {
     // The names of the effects to retarget, by kind of constraint.
     var kinds = {};
 
@@ -4028,12 +4294,21 @@ Duik.Constraint.writeTarget = function(layer, compName, layerName, only) {
         kinds[kind.matchName].names.push(effect.name);
     }
 
+    // The kinds sharing their expressions, like copy location and copy point location, each read the
+    // targets the previous one has just written.
     for (var matchName in kinds) {
         var kind = kinds[matchName].kind;
         var names = kinds[matchName].names;
         var targets = Duik.Constraint.constraintTargets(layer, kind);
-        for (var j = 0, m = names.length; j < m; j++)
-            targets[names[j]] = [compName, layerName];
+        for (var j = 0, m = names.length; j < m; j++) {
+            var target = [compName, layerName];
+            if (kind.path) {
+                var address = path;
+                if (!isdef(address) && targets[names[j]]) address = targets[names[j]][2];
+                if (address) target.push(address);
+            }
+            targets[names[j]] = target;
+        }
         Duik.Constraint.writeExpressions(layer, kind, targets);
     }
 }
@@ -4043,7 +4318,9 @@ Duik.Constraint.writeTarget = function(layer, compName, layerName, only) {
  * @private
  * @param {Layer} layer - The constrained layer.
  * @param {Object} kind - The kind of constraint, as returned by {@link Duik.Constraint.constraintKind}.
- * @return {Object} The targets, as <code>{ effectName: [compName, layerName] }</code>.
+ * @return {Object} The targets, as <code>{ effectName: [compName, layerName] }</code>, and
+ * <code>[compName, layerName, pathAddress]</code> for the point constraints.<br />
+ * The kinds sharing their expressions, like copy location and copy point location, read the targets of each other too.
  */
 Duik.Constraint.constraintTargets = function(layer, kind) {
     var targets = {};
@@ -4095,14 +4372,16 @@ Duik.Constraint.isHiddenProperty = function(layer, matchName) {
 }
 
 /**
- * Tells what a copy location, copy rotation or armature constraint currently points at. The target
- * can't be shown in the effect itself: an After Effects effect has no parameter able to
- * display a name, and effect parameters can't be renamed.
+ * Tells what a copy location, copy rotation, copy point location, copy point rotation or armature
+ * constraint currently points at. The target can't be shown in the effect itself: an After Effects
+ * effect has no parameter able to display a name, and effect parameters can't be renamed.
  * @param {PropertyBase|DuAEProperty} [effect] - The constraint effect, or any of its parameters.
  * The selected one in the active composition if omitted.
- * @return {Object|null} <code>{ effect, comp, layer, restPose }</code>: the name of the effect, the names
- * of the composition and the layer it points at, which are empty strings when no target has been
- * set yet, and whether the constraint has a rest pose, set with {@link Duik.Constraint.setRestPose}.<br />
+ * @return {Object|null} <code>{ effect, comp, layer, path, usesPath, restPose }</code>: the name of the
+ * effect, the names of the composition and the layer it points at, which are empty strings when no
+ * target has been set yet, the address of the path it points at, as {@link Duik.Constraint.pathAddress}
+ * gives it, or null, whether the constraint targets a path, which the point constraints do, and whether
+ * it has a rest pose, set with {@link Duik.Constraint.setRestPose}.<br />
  * <code>null</code> if there's no constraint.
  */
 Duik.Constraint.getTarget = function(effect) {
@@ -4114,6 +4393,8 @@ Duik.Constraint.getTarget = function(effect) {
         effect: constraint.name,
         comp: t ? t[0] : '',
         layer: t ? t[1] : '',
+        path: t && t[2] ? t[2] : null,
+        usesPath: constraint.kind.path,
         restPose: constraint.kind.restPose
     };
 }
@@ -4141,26 +4422,32 @@ Duik.Constraint.keepSelection = function(comp, callback) {
 
 Duik.CmdLib['Constraint']["Set constraint target"] = "Duik.Constraint.setTarget()";
 /**
- * Points a copy location, copy rotation or armature constraint at a layer, which can live in any
- * composition of the project. The other constraints of its layer keep their target.<br />
+ * Points a copy location, copy rotation, copy point location, copy point rotation or armature constraint
+ * at a layer, which can live in any composition of the project, and a point constraint at a path of this
+ * layer. The other constraints of its layer keep their target.<br />
  * An armature constraint takes the current pose of its new target as its rest pose, so that its
  * layer doesn't move: see {@link Duik.Constraint.setRestPose}.<br />
- * The target is looked up by name, so run this again after renaming the composition
- * or the target layer.
+ * The target is looked up by name, so run this again after renaming the composition,
+ * the target layer, or the path and the groups holding it.
  * @param {CompItem} comp - The composition holding the target.
  * @param {Layer} target - The target layer.
  * @param {PropertyBase|DuAEProperty} [effect] - The constraint effect, or any of its parameters.
  * The selected one in the active composition if omitted.
+ * @param {PropertyBase|DuAEProperty|Array.<string|int>|null} [path] - The path a point constraint targets:
+ * a path property of the target layer, the shape path or mask holding it, or its address, as
+ * {@link Duik.Constraint.pathAddress} gives it. Ignored by the other constraints. When omitted, a point
+ * constraint keeps the address it had, and finds the path at the same place in the new target layer.
  */
-Duik.Constraint.setTarget = function(comp, target, effect) {
+Duik.Constraint.setTarget = function(comp, target, effect, path) {
     if (!comp || !target) return;
     var constraint = Duik.Constraint.getTargetConstraints(effect)[0];
     if (!constraint) return;
+    if (path && !(path instanceof Array)) path = Duik.Constraint.pathAddress(path);
 
     DuAE.beginUndoGroup( i18n._("Set constraint target"), false);
 
     Duik.Constraint.keepSelection(constraint.layer.containingComp, function() {
-        Duik.Constraint.writeTarget(constraint.layer, comp.name, target.name, [constraint.name]);
+        Duik.Constraint.writeTarget(constraint.layer, comp.name, target.name, [constraint.name], path);
         if (constraint.kind.restPose) Duik.Constraint.captureRestPose(constraint);
     });
 
@@ -4168,17 +4455,48 @@ Duik.Constraint.setTarget = function(comp, target, effect) {
 }
 
 /**
- * Builds the expression of the copy location constraint.
+ * Builds the expression of the copy location and copy point location constraints: they share it, so
+ * that they're evaluated together, in the order of the effects, like the constraint stack of Blender.
  * @private
- * @param {Object} [targets] The targets, as <code>{ effectName: [compName, layerName] }</code>.
+ * @param {Object} [targets] The targets, as <code>{ effectName: [compName, layerName] }</code>, and
+ * <code>[compName, layerName, pathAddress]</code> for the copy point location constraints.
  * @return {string} The expression.
  */
 Duik.Constraint.copyLocationExpression = function(targets) {
-    var p = Duik.PseudoEffect.COPY_LOCATION.props;
+    var params = {
+        units: 'Transform units',
+        ratio: 'Custom ratio',
+        x: 'X',
+        invertX: 'Invert X',
+        y: 'Y',
+        invertY: 'Invert Y',
+        z: 'Z',
+        invertZ: 'Invert Z',
+        offset: 'Offset',
+        targetSpace: 'Target space',
+        ownerSpace: 'Owner space',
+        customSpace: 'Custom space',
+        influence: 'Influence'
+    };
+    var pointParams = { index: 'Point Index', component: 'Target Component' };
+    for (var key in params) pointParams[key] = params[key];
 
     return [DuAEExpression.Id.COPY_LOCATION_CONSTRAINT,
         DuAEExpression.Library.get(['checkDuikEffect']),
         Duik.Constraint.targetExpression(targets),
+        '',
+        '// The indices of the parameters of the two constraints this expression reads.',
+        'var COPY_LOCATION = ' + Duik.Constraint.paramIndices(Duik.PseudoEffect.COPY_LOCATION, params) + ';',
+        'var COPY_POINT_LOCATION = ' + Duik.Constraint.paramIndices(Duik.PseudoEffect.COPY_POINT_LOCATION, pointParams) + ';',
+        '',
+        '// The parameters of a constraint this expression reads, or null for any other effect.',
+        'function paramsOf(fx) {',
+        '    if ( checkDuikEffect(fx, "DUIK copyLocation") ) return COPY_LOCATION;',
+        '    if ( checkDuikEffect(fx, "DUIK copyPointLocation") ) return COPY_POINT_LOCATION;',
+        '    return null;',
+        '}',
+        '',
+        Duik.Constraint.pointFunctions(),
         '',
         '// The transform units, in the order of the drop down of the effect.',
         'var PIXELS = 1;',
@@ -4214,8 +4532,8 @@ Duik.Constraint.copyLocationExpression = function(targets) {
         '}',
         '',
         '// How the coordinates of the target composition are read into this one.',
-        'function unitFactor(fx, targetComp) {',
-        '    var units = fx(' + p['Transform units'].index + ').value;',
+        'function unitFactor(fx, P, targetComp) {',
+        '    var units = fx(P.units).value;',
         '    if (units == PERCENTAGE) {',
         '        // The same relative spot, whatever the resolution of the comps.',
         '        var sx = thisComp.width / targetComp.width;',
@@ -4223,7 +4541,7 @@ Duik.Constraint.copyLocationExpression = function(targets) {
         '        return [sx, sy, sx];',
         '    }',
         '    if (units == CUSTOM_RATIO) {',
-        '        var r = fx(' + p['Custom ratio'].index + ').value;',
+        '        var r = fx(P.ratio).value;',
         '        return [r, r, r];',
         '    }',
         '    return [1, 1, 1];',
@@ -4235,29 +4553,42 @@ Duik.Constraint.copyLocationExpression = function(targets) {
         '',
         'for ( var i = 1, n = thisLayer("Effects").numProperties; i <= n; i++ ) {',
         '    var fx = thisLayer.effect(i);',
-        '    if ( !checkDuikEffect(fx, "DUIK copyLocation") ) continue;',
+        '    var P = paramsOf(fx);',
+        '    if ( !P ) continue;',
         '    if ( !fx.active ) continue;',
         '',
         '    var t = targetOf(fx);',
         '    if (!t) continue;',
         '    var target = t.layer;',
         '',
+        '    // The location of the target: its anchor point, or a vertex of its path.',
+        '    var targetLocation;',
+        '    if (P == COPY_POINT_LOCATION) {',
+        '        var vertex = targetVertex(fx, P.index, target);',
+        '        if (!vertex) continue;',
+        '        var component = fx(P.component).value;',
+        '        var point = vertex.point;',
+        '        if (component == HANDLE_LEFT) point = vertex.left;',
+        '        else if (component == HANDLE_RIGHT) point = vertex.right;',
+        '        targetLocation = d3( target.toWorld([ point[0], point[1], 0 ]) );',
+        '    }',
+        '    else targetLocation = worldLocation(target);',
+        '',
         '    var customSpace = null;',
-        '    try { customSpace = fx( ' + p['Custom space'].index + ' ); }',
+        '    try { customSpace = fx(P.customSpace); }',
         '    catch (e) {}',
         '',
-        '    var targetSpace = fx( ' + p['Target space'].index + ' ).value;',
-        '    var ownerSpace = fx( ' + p['Owner space'].index + ' ).value;',
+        '    var targetSpace = fx(P.targetSpace).value;',
+        '    var ownerSpace = fx(P.ownerSpace).value;',
         '',
         '    // The location of the target, read in the target space.',
-        '    var targetLocation = worldLocation(target);',
         '    if (targetSpace == CUSTOM_SPACE && customSpace)',
         '        targetLocation = d3( customSpace.fromWorld(targetLocation) );',
         '    else if (targetSpace == LOCAL_SPACE)',
         '        targetLocation = toLocal(target, targetLocation);',
         '',
         '    // Scale the coordinates of the target composition into this one.',
-        '    var factor = unitFactor(fx, t.comp);',
+        '    var factor = unitFactor(fx, P, t.comp);',
         '    targetLocation = [ targetLocation[0] * factor[0],',
         '                       targetLocation[1] * factor[1],',
         '                       targetLocation[2] * factor[2] ];',
@@ -4269,9 +4600,9 @@ Duik.Constraint.copyLocationExpression = function(targets) {
         '    else if (ownerSpace == LOCAL_SPACE)',
         '        ownerSpaceLocation = toLocal(thisLayer, ownerSpaceLocation);',
         '',
-        '    var axis = [ fx(' + p['X'].index + ').value, fx(' + p['Y'].index + ').value, fx(' + p['Z'].index + ').value ];',
-        '    var invert = [ fx(' + p['Invert X'].index + ').value, fx(' + p['Invert Y'].index + ').value, fx(' + p['Invert Z'].index + ').value ];',
-        '    var offset = fx(' + p['Offset'].index + ').value;',
+        '    var axis = [ fx(P.x).value, fx(P.y).value, fx(P.z).value ];',
+        '    var invert = [ fx(P.invertX).value, fx(P.invertY).value, fx(P.invertZ).value ];',
+        '    var offset = fx(P.offset).value;',
         '',
         '    // Copy the enabled axis, keep the others.',
         '    var location = d3(ownerSpaceLocation);',
@@ -4291,7 +4622,7 @@ Duik.Constraint.copyLocationExpression = function(targets) {
         '',
         '    // Blend with the influence in comp space, like Blender does, so that',
         '    // several of these effects can be stacked on the same layer.',
-        '    var influence = fx(' + p['Influence'].index + ').value / 100;',
+        '    var influence = fx(P.influence).value / 100;',
         '    for (var b = 0; b < 3; b++) {',
         '        ownerLocation[b] += (location[b] - ownerLocation[b]) * influence;',
         '    }',
@@ -4353,7 +4684,87 @@ Duik.Constraint.copyLocation = function(comp, target, layers) {
 }
 
 /**
- * Builds the expressions of the copy rotation constraint: one for each rotation property it drives.<br />
+ * Adds a point constraint to layers: its effect, and the expressions it shares with its companion.
+ * @private
+ * @param {DuAEPseudoEffect} pe - The pseudo effect of the constraint.
+ * @param {string} undoName - The name of the undo group.
+ * @param {CompItem} [comp] - The composition holding the target.
+ * @param {Layer} [target] - The target layer.
+ * @param {PropertyBase|DuAEProperty|Array.<string|int>} [path] - The path of the target layer.
+ * @param {Layer|Layer[]|DuList.<Layer>} [layers] - The constrained layers.
+ * @return {Property[]} The effects added on the layers to control the constraint.
+ */
+Duik.Constraint.addPointConstraint = function(pe, undoName, comp, target, path, layers) {
+    layers = def(layers, DuAEComp.unselectLayers());
+    layers = new DuList(layers);
+
+    // A path property brings its layer and composition along.
+    var address = null;
+    if (path instanceof Array) address = path;
+    else if (path) {
+        address = Duik.Constraint.pathAddress(path);
+        if (address && !target) {
+            path = new DuAEProperty(path);
+            target = path.layer;
+            comp = target.containingComp;
+        }
+    }
+
+    DuAE.beginUndoGroup( undoName, false);
+
+    var effects = [];
+
+    layers.do(function(layer) {
+        // The name of the effect is the key of its target, so it has to be unique.
+        var name = Duik.Constraint.uniqueEffectName(layer, pe.name);
+        var effect = pe.apply(layer, name);
+        effects.push(effect);
+
+        var kind = Duik.Constraint.constraintKind(effect);
+        var targets = Duik.Constraint.constraintTargets(layer, kind);
+        if (comp && target) {
+            targets[name] = [comp.name, target.name];
+            if (address) targets[name].push(address);
+        }
+        Duik.Constraint.writeExpressions(layer, kind, targets);
+    });
+
+    DuAEComp.selectLayers(layers);
+
+    DuAE.endUndoGroup( undoName );
+
+    return effects;
+}
+
+Duik.CmdLib['Constraint']["Copy Point Location"] = "Duik.Constraint.copyPointLocation()";
+/**
+ * Adds a <i>copy point location</i> constraint to the layers: a copy location constraint whose target is
+ * a vertex of a Bezier path, or one of its two handles, picked by its index.<br />
+ * It has all the options of the copy location constraint, see {@link Duik.Constraint.copyLocation}, and
+ * shares its expression, so that both kinds are stacked on the same layer and evaluated in order.<br />
+ * The target is a path of a layer of any composition of the project, a shape path or a mask, picked in
+ * the Duik panel and looked up by name; it can be changed later with {@link Duik.Constraint.setTarget}.<br />
+ * The constraint is computed live by an expression and never needs a keyframe.
+ * @param {CompItem} [comp] - The composition holding the target.
+ * @param {Layer} [target] - The target layer.
+ * @param {PropertyBase|DuAEProperty|Array.<string|int>} [path] - The path of the target layer: a path
+ * property, the shape path or mask holding it, or its address, as {@link Duik.Constraint.pathAddress}
+ * gives it. A property is enough: its layer and its composition are the target when they're omitted.
+ * @param {Layer|Layer[]|DuList.<Layer>} [layers] - The constrained layers.
+ * @return {Property[]} The effects added on the layers to control the constraint.
+ */
+Duik.Constraint.copyPointLocation = function(comp, target, path, layers) {
+    return Duik.Constraint.addPointConstraint(
+        Duik.PseudoEffect.COPY_POINT_LOCATION,
+        i18n._("Copy Point Location"),
+        comp, target, path, layers
+    );
+}
+
+/**
+ * Builds the expressions of the copy rotation and copy point rotation constraints: one for each rotation
+ * property they drive. They share them, so that they're evaluated together, in the order of the effects,
+ * like the constraint stack of Blender.<br />
  * A 2D layer only turns around Z, and the constraint drives its <i>Rotation</i>, which also holds the
  * rotation of the layer itself: an expression reads the value its own property has before it.<br />
  * A 3D layer turns around three axis, which After Effects holds in its <i>X</i>, <i>Y</i> and
@@ -4361,16 +4772,35 @@ Duik.Constraint.copyLocation = function(comp, target, layers) {
  * its <i>Orientation</i>: an expression can't read what another property held before its own
  * expression, so a driven rotation can't be read back, while the orientation, which the constraint
  * leaves alone, can. Each of the three expressions computes the whole rotation and returns its own
- * angle; they always agree, as they read the same properties and take the same Euler angles.
+ * angle; they always agree, as they read the same properties and take the same Euler angles.<br />
+ * A copy point rotation constraint reads the rotation of a point of a path as the rotation of a child of
+ * the layer of the path, placed at the point and turned along the tangent there.
  * @private
- * @param {Object} [targets] The targets, as <code>{ effectName: [compName, layerName] }</code>.
+ * @param {Object} [targets] The targets, as <code>{ effectName: [compName, layerName] }</code>, and
+ * <code>[compName, layerName, pathAddress]</code> for the copy point rotation constraints.
  * @param {string} [property='ADBE Rotate Z'] The match name of the property: <code>'ADBE Rotate X'</code>,
  * <code>'ADBE Rotate Y'</code> or <code>'ADBE Rotate Z'</code>.
  * @return {string} The expression.
  */
 Duik.Constraint.copyRotationExpression = function(targets, property) {
     property = def(property, 'ADBE Rotate Z');
-    var p = Duik.PseudoEffect.COPY_ROTATION.props;
+
+    var params = {
+        eulerOrder: 'Euler order',
+        x: 'X',
+        invertX: 'Invert X',
+        y: 'Y',
+        invertY: 'Invert Y',
+        z: 'Z',
+        invertZ: 'Invert Z',
+        mixMode: 'Mix mode',
+        targetSpace: 'Target space',
+        ownerSpace: 'Owner space',
+        customSpace: 'Custom space',
+        influence: 'Influence'
+    };
+    var pointParams = { index: 'Point Index', tangent: 'Tangent' };
+    for (var key in params) pointParams[key] = params[key];
 
     // The axis this expression drives.
     var axis = 2;
@@ -4430,10 +4860,21 @@ Duik.Constraint.copyRotationExpression = function(targets, property) {
         '// the space its children live in, mirrored when the layer or its parents are negatively scaled.',
         '// The skew of a parent scaled unevenly is left out: X is kept, and Y made square to it.',
         'function axisOf(l) {',
-        '    var x = d3(l.toWorldVec([1, 0, 0]));',
-        '    var y = d3(l.toWorldVec([0, 1, 0]));',
+        '    return axisFrom( d3(l.toWorldVec([1, 0, 0])), d3(l.toWorldVec([0, 1, 0])), d3(l.toWorldVec([0, 0, 1])) );',
+        '}',
+        '',
+        '// The rotation of a point of a path in the space of the comp: the axis of a child of the layer',
+        '// of the path, placed at the point and turned along the tangent there, in the space of the layer.',
+        '// Its X axis goes the way the path goes, and its Y axis is the normal of the path.',
+        'function pointFrame(l, tangent) {',
+        '    var t = tangent;',
+        '    return axisFrom( d3(l.toWorldVec([t[0], t[1], 0])), d3(l.toWorldVec([-t[1], t[0], 0])), d3(l.toWorldVec([0, 0, 1])) );',
+        '}',
+        '',
+        '// The axis, as the columns of a matrix of unit vectors, from the vectors X, Y and Z of a space.',
+        'function axisFrom(x, y, z) {',
         '    // A 2D layer has no depth.',
-        '    var z = unit(d3(l.toWorldVec([0, 0, 1]))) || [0, 0, 1];',
+        '    z = unit(z) || [0, 0, 1];',
         '    var mirrored = dot(cross(x, y), z) < 0;',
         '    x = unit(x) || [1, 0, 0];',
         '    var d = dot(x, y);',
@@ -4616,11 +5057,11 @@ Duik.Constraint.copyRotationExpression = function(targets, property) {
         '',
         '// Blender\'s copy rotation: the rotation of the target is copied through Euler angles,',
         '// axis by axis, and mixed with the rotation of this layer.',
-        'function copiedRotation(fx, own, target) {',
-        '    var order = eulerOrder( fx(' + p['Euler order'].index + ').value );',
-        '    var axis = [ fx(' + p['X'].index + ').value, fx(' + p['Y'].index + ').value, fx(' + p['Z'].index + ').value ];',
-        '    var invert = [ fx(' + p['Invert X'].index + ').value, fx(' + p['Invert Y'].index + ').value, fx(' + p['Invert Z'].index + ').value ];',
-        '    var mixMode = fx(' + p['Mix mode'].index + ').value;',
+        'function copiedRotation(fx, P, own, target) {',
+        '    var order = eulerOrder( fx(P.eulerOrder).value );',
+        '    var axis = [ fx(P.x).value, fx(P.y).value, fx(P.z).value ];',
+        '    var invert = [ fx(P.invertX).value, fx(P.invertY).value, fx(P.invertZ).value ];',
+        '    var mixMode = fx(P.mixMode).value;',
         '',
         '    var ownEuler = eulerOf(own, order);',
         '    var euler = compatibleEulerOf(target, ownEuler, order);',
@@ -4665,28 +5106,37 @@ Duik.Constraint.copyRotationExpression = function(targets, property) {
         '',
         '    for ( var i = 1, n = thisLayer("Effects").numProperties; i <= n; i++ ) {',
         '        var fx = thisLayer.effect(i);',
-        '        if ( !checkDuikEffect(fx, "DUIK copyRotation") ) continue;',
+        '        var P = paramsOf(fx);',
+        '        if ( !P ) continue;',
         '        if ( !fx.active ) continue;',
         '',
         '        var t = targetOf(fx);',
         '        if (!t) continue;',
         '',
         '        // Like Blender, skip the constraints without influence.',
-        '        var influence = fx(' + p['Influence'].index + ').value / 100;',
+        '        var influence = fx(P.influence).value / 100;',
         '        if (influence <= 0) continue;',
         '',
+        '        // The rotation of the target: the one of the layer, or the one of a point of its path.',
+        '        var targetFrame;',
+        '        if (P == COPY_POINT_ROTATION) {',
+        '            var tangent = targetTangent(fx, t.layer);',
+        '            if (!tangent) continue;',
+        '            targetFrame = pointFrame(t.layer, tangent);',
+        '        }',
+        '        else targetFrame = frameOf(t.layer);',
+        '',
         '        var customSpace = null;',
-        '        try { customSpace = fx( ' + p['Custom space'].index + ' ); }',
+        '        try { customSpace = fx(P.customSpace); }',
         '        catch (e) {}',
         '        // The custom space turns the rotations only, whether its layer is mirrored or not, as on 2D layers.',
         '        var customRotation = identity();',
         '        if (customSpace) customRotation = rotationOf(frameOf(customSpace));',
         '',
-        '        var targetSpace = fx( ' + p['Target space'].index + ' ).value;',
-        '        var ownerSpace = fx( ' + p['Owner space'].index + ' ).value;',
+        '        var targetSpace = fx(P.targetSpace).value;',
+        '        var ownerSpace = fx(P.ownerSpace).value;',
         '',
         '        // The rotation of the target, read in the target space.',
-        '        var targetFrame = frameOf(t.layer);',
         '        if (targetSpace == CUSTOM_SPACE && customSpace)',
         '            targetFrame = multiply( transposed(customRotation), targetFrame );',
         '        else if (targetSpace == LOCAL_SPACE)',
@@ -4698,7 +5148,7 @@ Duik.Constraint.copyRotationExpression = function(targets, property) {
         '        else if (ownerSpace == LOCAL_SPACE) space = parentAxis;',
         '        var ownFrame = multiply( transposed(space), ownerFrame );',
         '',
-        '        var rotation = copiedRotation( fx, rotationOf(ownFrame), rotationOf(targetFrame) );',
+        '        var rotation = copiedRotation( fx, P, rotationOf(ownFrame), rotationOf(targetFrame) );',
         '',
         '        // Back to comp space, as mirrored as this layer is.',
         '        var frame = multiply( space, frameFrom(rotation, determinant(ownFrame) < 0) );',
@@ -4755,6 +5205,45 @@ Duik.Constraint.copyRotationExpression = function(targets, property) {
         '    return 0;',
         '}',
         '',
+        '// The rotation of a point of a path around Z, in the space of the comp, or relative to the parent',
+        '// of the layer of the path when local: the rotation of a child of that layer, placed at the point',
+        '// and turned along the tangent there. The layer and its parents pass their turns on, and the',
+        '// tangent is read as seen on screen, so that it\'s followed even when the layer is scaled unevenly.',
+        'function pointRotation(l, tangent, local) {',
+        '    // A vector of the layer, in the space the rotation is read in.',
+        '    function vector(v) {',
+        '        var w = l.toWorldVec([ v[0], v[1], 0 ]);',
+        '        if (local && l.hasParent) w = l.parent.fromWorldVec(w);',
+        '        return w;',
+        '    }',
+        '    var x = vector([1, 0]);',
+        '    var y = vector([0, 1]);',
+        '    var t = vector(tangent);',
+        '',
+        '    // As for a layer, a mirrored rotation is read with its X axis flipped.',
+        '    var flip = x[0] * y[1] - x[1] * y[0] < 0 ? -1 : 1;',
+        '    var turn = radiansToDegrees( Math.atan2(flip * t[1], flip * t[0]) - Math.atan2(flip * x[1], flip * x[0]) );',
+        '    // The angle between the X axis of the layer and the tangent, between -180 and 180 degrees.',
+        '    turn = (turn + 540) % 360 - 180;',
+        '',
+        '    // What the layer passes on to its children, read the way worldRotation reads it.',
+        '    var r = 0;',
+        '    var u = 1;',
+        '    var p = l;',
+        '    while (true) {',
+        '        u *= p.scale.value[1];',
+        '        if (local || !p.hasParent) {',
+        '            r += localRotation(p);',
+        '            break;',
+        '        }',
+        '        var s = p.parent.scale.value;',
+        '        r += localRotation(p) * Math.sign(s[0] * s[1]);',
+        '        p = p.parent;',
+        '    }',
+        '    if (u < 0) r += 180;',
+        '    return r + turn;',
+        '}',
+        '',
         '// The rotation of a layer in the space of its own comp, every parent applied.',
         'function worldRotation(l) {',
         '    var r = localRotation(l) * scaleMirror(l) + scaleUTurn(l);',
@@ -4788,7 +5277,8 @@ Duik.Constraint.copyRotationExpression = function(targets, property) {
         '',
         '    for ( var i = 1, n = thisLayer("Effects").numProperties; i <= n; i++ ) {',
         '        var fx = thisLayer.effect(i);',
-        '        if ( !checkDuikEffect(fx, "DUIK copyRotation") ) continue;',
+        '        var P = paramsOf(fx);',
+        '        if ( !P ) continue;',
         '        if ( !fx.active ) continue;',
         '',
         '        var t = targetOf(fx);',
@@ -4796,29 +5286,38 @@ Duik.Constraint.copyRotationExpression = function(targets, property) {
         '        var target = t.layer;',
         '',
         '        // This rotation is around Z only: without it, there\'s nothing to copy.',
-        '        if ( !fx(' + p['Z'].index + ').value ) continue;',
+        '        if ( !fx(P.z).value ) continue;',
+        '',
+        '        var tangent = null;',
+        '        if (P == COPY_POINT_ROTATION) {',
+        '            tangent = targetTangent(fx, target);',
+        '            if (!tangent) continue;',
+        '        }',
         '',
         '        var customSpace = null;',
-        '        try { customSpace = fx( ' + p['Custom space'].index + ' ); }',
+        '        try { customSpace = fx(P.customSpace); }',
         '        catch (e) {}',
         '        var customRotation = 0;',
         '        if (customSpace) customRotation = worldRotation(customSpace);',
         '',
-        '        var targetSpace = fx( ' + p['Target space'].index + ' ).value;',
-        '        var ownerSpace = fx( ' + p['Owner space'].index + ' ).value;',
+        '        var targetSpace = fx(P.targetSpace).value;',
+        '        var ownerSpace = fx(P.ownerSpace).value;',
         '',
-        '        // The rotation of the target, read in the target space.',
-        '        var targetRotation = worldRotation(target);',
-        '        if (targetSpace == CUSTOM_SPACE && customSpace) targetRotation -= customRotation;',
+        '        // The rotation of the target, read in the target space: the one of the layer,',
+        '        // or the one of a point of its path.',
+        '        var targetRotation;',
+        '        if (tangent) targetRotation = pointRotation(target, tangent, targetSpace == LOCAL_SPACE);',
         '        else if (targetSpace == LOCAL_SPACE) targetRotation = localRotation(target);',
+        '        else targetRotation = worldRotation(target);',
+        '        if (targetSpace == CUSTOM_SPACE && customSpace) targetRotation -= customRotation;',
         '',
         '        // The rotation of this layer, in the owner space.',
         '        var ownRotation = ownerRotation;',
         '        if (ownerSpace == CUSTOM_SPACE && customSpace) ownRotation -= customRotation;',
         '        else if (ownerSpace == LOCAL_SPACE) ownRotation = toLocalRotation(ownerRotation);',
         '',
-        '        var invert = fx(' + p['Invert Z'].index + ').value;',
-        '        var mixMode = fx(' + p['Mix mode'].index + ').value;',
+        '        var invert = fx(P.invertZ).value;',
+        '        var mixMode = fx(P.mixMode).value;',
         '',
         '        // Around a single axis, rotations commute and combine by adding their',
         '        // angles, so "Add", "Before Original" and "After Original" coincide.',
@@ -4839,7 +5338,7 @@ Duik.Constraint.copyRotationExpression = function(targets, property) {
         '',
         '        // Blend with the influence in comp space, like Blender does, so that',
         '        // several of these effects can be stacked on the same layer.',
-        '        var influence = fx(' + p['Influence'].index + ').value / 100;',
+        '        var influence = fx(P.influence).value / 100;',
         '        ownerRotation += (rotation - ownerRotation) * influence;',
         '        constrained = true;',
         '    }',
@@ -4875,6 +5374,26 @@ Duik.Constraint.copyRotationExpression = function(targets, property) {
     return [DuAEExpression.Id.COPY_ROTATION_CONSTRAINT,
         DuAEExpression.Library.get(['checkDuikEffect', 'sign']),
         Duik.Constraint.targetExpression(targets),
+        '',
+        '// The indices of the parameters of the two constraints this expression reads.',
+        'var COPY_ROTATION = ' + Duik.Constraint.paramIndices(Duik.PseudoEffect.COPY_ROTATION, params) + ';',
+        'var COPY_POINT_ROTATION = ' + Duik.Constraint.paramIndices(Duik.PseudoEffect.COPY_POINT_ROTATION, pointParams) + ';',
+        '',
+        '// The parameters of a constraint this expression reads, or null for any other effect.',
+        'function paramsOf(fx) {',
+        '    if ( checkDuikEffect(fx, "DUIK copyRotation") ) return COPY_ROTATION;',
+        '    if ( checkDuikEffect(fx, "DUIK copyPointRotation") ) return COPY_POINT_ROTATION;',
+        '    return null;',
+        '}',
+        '',
+        Duik.Constraint.pointFunctions(),
+        '',
+        '// The tangent of the path a copy point rotation constraint reads, or null.',
+        'function targetTangent(fx, l) {',
+        '    var vertex = targetVertex(fx, COPY_POINT_ROTATION.index, l);',
+        '    if (!vertex) return null;',
+        '    return vertexTangent(vertex, fx(COPY_POINT_ROTATION.tangent).value);',
+        '}',
         '',
         '// The mix modes, in the order of the drop down of the effect.',
         'var REPLACE = 1;',
@@ -4945,6 +5464,34 @@ Duik.Constraint.copyRotation = function(comp, target, layers) {
     DuAE.endUndoGroup( i18n._("Copy Rotation"));
 
     return effects;
+}
+
+Duik.CmdLib['Constraint']["Copy Point Rotation"] = "Duik.Constraint.copyPointRotation()";
+/**
+ * Adds a <i>copy point rotation</i> constraint to the layers: a copy rotation constraint whose target
+ * is a point of a Bezier path, turned along the path, so that the layer follows its curvature.<br />
+ * The point is a vertex of the path, picked by its index. It turns like a child of the layer of the path
+ * would, placed on the vertex, with its X axis along the tangent there, the way the path goes, and its
+ * Y axis along the normal. At a corner, the tangent can be taken on either side of the vertex, or halfway.<br />
+ * It has all the options of the copy rotation constraint, see {@link Duik.Constraint.copyRotation}, and
+ * shares its expressions, so that both kinds are stacked on the same layer and evaluated in order.<br />
+ * The target is a path of a layer of any composition of the project, a shape path or a mask, picked in
+ * the Duik panel and looked up by name; it can be changed later with {@link Duik.Constraint.setTarget}.<br />
+ * The constraint is computed live by expressions and never needs a keyframe.
+ * @param {CompItem} [comp] - The composition holding the target.
+ * @param {Layer} [target] - The target layer.
+ * @param {PropertyBase|DuAEProperty|Array.<string|int>} [path] - The path of the target layer: a path
+ * property, the shape path or mask holding it, or its address, as {@link Duik.Constraint.pathAddress}
+ * gives it. A property is enough: its layer and its composition are the target when they're omitted.
+ * @param {Layer|Layer[]|DuList.<Layer>} [layers] - The constrained layers.
+ * @return {Property[]} The effects added on the layers to control the constraint.
+ */
+Duik.Constraint.copyPointRotation = function(comp, target, path, layers) {
+    return Duik.Constraint.addPointConstraint(
+        Duik.PseudoEffect.COPY_POINT_ROTATION,
+        i18n._("Copy Point Rotation"),
+        comp, target, path, layers
+    );
 }
 
 /**
@@ -5356,12 +5903,13 @@ Duik.Constraint.setRestPose = function(effect) {
  * Tells what a constraint effect drives, and how to apply it.
  * @private
  * @param {PropertyGroup} effect The effect.
- * @return {Object|null} <code>{ matchName, properties, id, expression, named, restPose }</code>: the
+ * @return {Object|null} <code>{ matchName, properties, id, expression, named, path, restPose }</code>: the
  * match name of the effect, the match names of the transform properties its expressions can drive, and
- * the id of these expressions.<br />
+ * the id of these expressions. Kinds with the same id share their expressions.<br />
  * <code>expression</code> is the function building the expressions of a constraint whose target is set
- * in Duik — copy location, copy rotation or armature — from its targets and the match name of the
- * property, <code>null</code> for the other constraints.<br />
+ * in Duik — copy location, copy rotation, copy point location, copy point rotation or armature — from
+ * its targets and the match name of the property, <code>null</code> for the other constraints.<br />
+ * <code>path</code> is true when the target of the constraint is a path of its target layer.<br />
  * <code>named</code> is true when the expressions read the effect by its name, instead of going
  * through all the effects of its kind.<br />
  * <code>restPose</code> is true when the constraint has a rest pose, set by {@link Duik.Constraint.setRestPose}.<br />
@@ -5379,6 +5927,19 @@ Duik.Constraint.constraintKind = function(effect) {
         properties: ['ADBE Rotate X', 'ADBE Rotate Y', 'ADBE Rotate Z'],
         id: DuAEExpression.Id.COPY_ROTATION_CONSTRAINT,
         expression: Duik.Constraint.copyRotationExpression
+    }, {
+        // The point constraints share the expressions of their companion, to be stacked with it.
+        pe: Duik.PseudoEffect.COPY_POINT_LOCATION,
+        properties: ['ADBE Position'],
+        id: DuAEExpression.Id.COPY_LOCATION_CONSTRAINT,
+        expression: Duik.Constraint.copyLocationExpression,
+        path: true
+    }, {
+        pe: Duik.PseudoEffect.COPY_POINT_ROTATION,
+        properties: ['ADBE Rotate X', 'ADBE Rotate Y', 'ADBE Rotate Z'],
+        id: DuAEExpression.Id.COPY_ROTATION_CONSTRAINT,
+        expression: Duik.Constraint.copyRotationExpression,
+        path: true
     }, {
         pe: Duik.PseudoEffect.ARMATURE,
         properties: ['ADBE Position', 'ADBE Rotate Z', 'ADBE Scale'],
@@ -5415,6 +5976,7 @@ Duik.Constraint.constraintKind = function(effect) {
             id: kind.id,
             expression: def(kind.expression, null),
             named: def(kind.named, false),
+            path: def(kind.path, false),
             restPose: def(kind.restPose, false)
         };
     }
@@ -5437,11 +5999,12 @@ Duik.Constraint.applyConstraint = function(layer, name) {
 
     var time = layer.containingComp.time;
 
-    // The expressions are still needed as long as other constraints of this kind remain,
+    // The expressions are still needed as long as other constraints sharing them remain,
     // unless they read this effect by its name.
     var count = 0;
     for (var i = 1, n = effects.numProperties; i <= n; i++) {
-        if (effects.property(i).matchName.indexOf(kind.matchName) == 0) count++;
+        var other = Duik.Constraint.constraintKind(effects.property(i));
+        if (other && other.id == kind.id) count++;
     }
     var keep = count > 1 && !kind.named;
 
@@ -5531,7 +6094,7 @@ Duik.Constraint.applyConstraint = function(layer, name) {
  * @param {PropertyBase|DuAEProperty|PropertyBase[]|DuAEProperty[]|DuList.<PropertyBase>} [props] - The constraint effects,
  * or any of their parameters. The selected ones in the active composition if omitted.
  * @param {Boolean} [targetOnly=false] - Set to true to keep only the constraints whose target is set in Duik:
- * copy location, copy rotation and armature.
+ * copy location, copy rotation, copy point location, copy point rotation and armature.
  * @return {Object[]} One <code>{ layer, name, index, kind }</code> per constraint: the constrained
  * layer, the name and index of the effect, and what it drives, as returned by
  * {@link Duik.Constraint.constraintKind}.<br />
@@ -5574,7 +6137,7 @@ Duik.Constraint.getConstraints = function(props, targetOnly) {
 
 /**
  * Finds the constraints whose target is set in Duik among properties: the copy location,
- * copy rotation and armature constraints.
+ * copy rotation, copy point location, copy point rotation and armature constraints.
  * @private
  * @param {PropertyBase|DuAEProperty|PropertyBase[]|DuAEProperty[]|DuList.<PropertyBase>} [props] - The constraint effects,
  * or any of their parameters. The selected ones in the active composition if omitted.
@@ -5588,8 +6151,10 @@ Duik.CmdLib['Constraint']["Apply Constraint"] = "Duik.Constraint.apply()";
 /**
  * Applies constraints, the way Blender's <i>Apply</i> does: the result of the constraint at the
  * current time becomes the value of the properties it drives, and its effect is removed.<br />
- * This works with the position, copy location, orientation, copy rotation, path, parent and armature constraints.<br />
- * A copy location, copy rotation or armature constraint is evaluated alone, on the unconstrained value of
+ * This works with the position, copy location, orientation, copy rotation, copy point location, copy point
+ * rotation, path, parent and armature constraints.<br />
+ * A copy location, copy rotation, copy point location, copy point rotation or armature constraint is
+ * evaluated alone, on the unconstrained value of
  * the layer, and the other constraints are left in place: as in Blender, applying a constraint which isn't
  * the first of its stack may move the layer. The constraints are applied from top to bottom, so applying
  * a whole stack at once keeps the layer where it is.<br />

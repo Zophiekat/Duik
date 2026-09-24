@@ -379,7 +379,14 @@ function createKleanerButton( container ) {
             w16_kleaner,
             i18n._("Clean Keyframes.\nAutomates the animation process, and makes it easier to control:\n- Anticipation\n- Motion interpolation\n- Overlap\n- Follow through or Bounce\n- Soft Body simulation\n")
         );
-    kleanerGroup.build = function() {
+    kleanerGroup.build = buildKleanerMenu;
+}
+
+/**
+ * Builds the menu of the Kleaner presets, with <code>this.addButton</code>: <code>this</code> is the button showing
+ * the menu, Duik's multi-button or the native one of {@link addNativeKleanerButton}.
+ */
+function buildKleanerMenu() {
         var aliveButton = this.addButton(
             i18n._("Alive (anticipation + interpolation + follow through)"),
             undefined,
@@ -574,7 +581,6 @@ function createKleanerButton( container ) {
 
             DuAE.endUndoGroup();
         };
-    };
 }
 
 function createSubPanel( container, title, mainGroup, pinButton ) {

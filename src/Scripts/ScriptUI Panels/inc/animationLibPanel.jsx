@@ -232,185 +232,131 @@ function buildAnimationLibPanel( animationLibGroup ) {
     }
 
     // UI Popups
-    var runOptionsPopup = DuScriptUI.popUp( 'Options' );
+    var runOptionsPopup = addNativePopup( 'Options' );
     runOptionsPopup.build = function() {
         if (runOptionsPopup.built) return;
 
-        var settingsKeysSelector = DuScriptUI.selector(runOptionsPopup.content);
-        settingsKeysSelector.addButton(
-            i18n._("All properties"),
-            w16_props
-        );
-        settingsKeysSelector.addButton(
-            i18n._("Keyframes only"),
-            w16_keyframe
-        );
-        settingsKeysSelector.setCurrentIndex(0);
+        var settingsKeysSelector = addNativeDropdown(runOptionsPopup.content, [
+            [i18n._("All properties"), w16_props],
+            [i18n._("Keyframes only"), w16_keyframe]
+        ], 0);
 
-        var propsGroup = DuScriptUI.group(runOptionsPopup.content, 'row');
+        // The properties, as a row of checkboxes named by their image.
+        var propsGroup = addNativeGroup(runOptionsPopup.content, 'row');
         propsGroup.alignment = ['center', 'top'];
 
-        var posButton = DuScriptUI.checkBox(
-            propsGroup,
-            '',
-            w16_move,
-            i18n._("Position")
-        );
-        posButton.setChecked(true);
-
-        var rotButton = DuScriptUI.checkBox(
-            propsGroup,
-            '',
-            w16_rotate,
-            i18n._("Rotation")
-        );
-        rotButton.setChecked(true);
-
-        var scaButton = DuScriptUI.checkBox(
-            propsGroup,
-            '',
-            w16_scale,
-            i18n._("Scale")
-        );
-        scaButton.setChecked(true);
-
-        var opaButton = DuScriptUI.checkBox(
-            propsGroup,
-            '',
-            w16_opacity,
-            i18n._("Opacity")
-        );
-        opaButton.setChecked(true);
-
-        var masksButton = DuScriptUI.checkBox(
-            propsGroup,
-            '',
-            w16_mask,
-            i18n._("Masks")
-        );
-        masksButton.setChecked(true);
-
-        var fxButton = DuScriptUI.checkBox(
-            propsGroup,
-            '',
-            w16_fx,
-            i18n._("Effects")
-        );
-        fxButton.setChecked(true);
-
-        var allPropsButton = DuScriptUI.checkBox(
-            propsGroup,
-            '',
-            w16_props,
-            i18n._("All properties")
-        );
-        allPropsButton.setChecked(true);
+        var posButton = addNativeCheckBox( propsGroup, '', w16_move, i18n._("Position"), true );
+        var rotButton = addNativeCheckBox( propsGroup, '', w16_rotate, i18n._("Rotation"), true );
+        var scaButton = addNativeCheckBox( propsGroup, '', w16_scale, i18n._("Scale"), true );
+        var opaButton = addNativeCheckBox( propsGroup, '', w16_opacity, i18n._("Opacity"), true );
+        var masksButton = addNativeCheckBox( propsGroup, '', w16_mask, i18n._("Masks"), true );
+        var fxButton = addNativeCheckBox( propsGroup, '', w16_fx, i18n._("Effects"), true );
+        var allPropsButton = addNativeCheckBox( propsGroup, '', w16_props, i18n._("All properties"), true );
 
         allPropsButton.onClick = function() {
-            var checked = allPropsButton.checked;
-            posButton.setChecked(checked);
-            rotButton.setChecked(checked);
-            scaButton.setChecked(checked);
-            opaButton.setChecked(checked);
-            masksButton.setChecked(checked);
-            fxButton.setChecked(checked);
+            var checked = allPropsButton.value;
+            posButton.value = checked;
+            rotButton.value = checked;
+            scaButton.value = checked;
+            opaButton.value = checked;
+            masksButton.value = checked;
+            fxButton.value = checked;
         };
 
         function getMatchNames() {
             var props = [];
-            if (!allPropsButton.checked) {
-                if (posButton.checked) {
+            if (!allPropsButton.value) {
+                if (posButton.value) {
                     props.push('ADBE Position');
                     props.push('ADBE Vector Position');
                     props.push('ADBE Position_0');
                     props.push('ADBE Position_1');
                     props.push('ADBE Position_2');
                 }
-                if (rotButton.checked) {
+                if (rotButton.value) {
                     props.push('ADBE Rotate Z');
                     props.push('ADBE Rotate Y');
                     props.push('ADBE Rotate X');
                     props.push('ADBE Orientation');
                     props.push('ADBE Vector Rotation');
                 }
-                if (scaButton.checked) {
+                if (scaButton.value) {
                     props.push('ADBE Scale');
                     props.push('ADBE Vector Scale');
                 }
-                if (opaButton.checked) {
+                if (opaButton.value) {
                     props.push('ADBE Opacity');
                     props.push('ADBE Vector Group Opacity');
                 }
-                if (masksButton.checked) {
+                if (masksButton.value) {
                     props.push('ADBE Mask Parade');
                 }
-                if (fxButton.checked) {
+                if (fxButton.value) {
                     props.push('ADBE Effect Parade');
                 }
             }
             return props;
         }
 
-        var offsetSelector = DuScriptUI.selector(runOptionsPopup.content);
-        offsetSelector.addButton(
-            i18n._("Offset values"),
-            w16_offset,
-            i18n._("Offset current values.")
-        );
-        offsetSelector.addButton(
-            i18n._("Absolute"),
-            w16_locator,
-            i18n._("Absolute values (replaces current values).")
-        );
-        offsetSelector.setCurrentIndex(1);
+        var offsetSelector = addNativeDropdown(runOptionsPopup.content, [
+            [
+                i18n._("Offset values"),
+                w16_offset,
+                i18n._("Offset current values.")
+            ],
+            [
+                i18n._("Absolute"),
+                w16_locator,
+                i18n._("Absolute values (replaces current values).")
+            ]
+        ], 1);
 
-        var reverseButton = DuScriptUI.checkBox(
+        var reverseButton = addNativeCheckBox(
             runOptionsPopup.content,
             i18n._("Reverse keyframes"),
             undefined,
             i18n._("Reverses the animation in time.")
         );
 
-        DuScriptUI.separator(runOptionsPopup.content);
+        addNativeSeparator(runOptionsPopup.content);
 
-        var applyButton = DuScriptUI.button(
+        var applyButton = addNativeButton(
             runOptionsPopup.content,
             i18n._("Apply"),
-            w12_check,
-            ''
+            w12_check
         );
 
         applyButton.onClick = lib.runItem;
 
         function getMatchNames() {
             var props = [];
-            if (!allPropsButton.checked) {
-                if (posButton.checked) {
+            if (!allPropsButton.value) {
+                if (posButton.value) {
                     props.push('ADBE Position');
                     props.push('ADBE Vector Position');
                     props.push('ADBE Position_0');
                     props.push('ADBE Position_1');
                     props.push('ADBE Position_2');
                 }
-                if (rotButton.checked) {
+                if (rotButton.value) {
                     props.push('ADBE Rotate Z');
                     props.push('ADBE Rotate Y');
                     props.push('ADBE Rotate X');
                     props.push('ADBE Orientation');
                     props.push('ADBE Vector Rotation');
                 }
-                if (scaButton.checked) {
+                if (scaButton.value) {
                     props.push('ADBE Scale');
                     props.push('ADBE Vector Scale');
                 }
-                if (opaButton.checked) {
+                if (opaButton.value) {
                     props.push('ADBE Opacity');
                     props.push('ADBE Vector Group Opacity');
                 }
-                if (masksButton.checked) {
+                if (masksButton.value) {
                     props.push('ADBE Mask Parade');
                 }
-                if (fxButton.checked) {
+                if (fxButton.value) {
                     props.push('ADBE Effect Parade');
                 }
             }
@@ -434,10 +380,10 @@ function buildAnimationLibPanel( animationLibGroup ) {
             DuIO.Animation.fromJson(
                 item.data,
                 undefined,
-                settingsKeysSelector.index == 1,
+                settingsKeysSelector.selection.index == 1,
                 props,
-                offsetSelector.index == 0,
-                reverseButton.checked
+                offsetSelector.selection.index == 0,
+                reverseButton.value
             );
             runItem(item.data);
         };
@@ -449,10 +395,10 @@ function buildAnimationLibPanel( animationLibGroup ) {
             DuIO.Animation.fromJson(
                 item.data,
                 undefined,
-                settingsKeysSelector.index == 1,
+                settingsKeysSelector.selection.index == 1,
                 props,
                 true,
-                reverseButton.checked
+                reverseButton.value
             );
 
             runItem(item.data);
@@ -465,9 +411,9 @@ function buildAnimationLibPanel( animationLibGroup ) {
             DuIO.Animation.fromJson(
                 item.data,
                 undefined,
-                settingsKeysSelector.index == 1,
+                settingsKeysSelector.selection.index == 1,
                 props,
-                offsetSelector.index == 0,
+                offsetSelector.selection.index == 0,
                 true
             );
 
@@ -481,7 +427,7 @@ function buildAnimationLibPanel( animationLibGroup ) {
             DuIO.Animation.fromJson(
                 item.data,
                 undefined,
-                settingsKeysSelector.index == 1,
+                settingsKeysSelector.selection.index == 1,
                 props,
                 true,
                 true
@@ -491,35 +437,31 @@ function buildAnimationLibPanel( animationLibGroup ) {
         };
     };
 
-    var catNameEditor = DuScriptUI.stringPrompt(
+    var catNameEditor = addNativeStringPrompt(
         i18n._("Edit category name"),
         i18n._("New Category")
     );
 
-    var animCreateEditor = DuScriptUI.popUp( i18n._("Create animation") );
+    var animCreateEditor = addNativePopup( i18n._("Create animation") );
     animCreateEditor.content.alignment = ['fill', 'top'];
 
-    var animCreateBakeButton = DuScriptUI.checkBox( animCreateEditor.content, {
-        text: i18n._("Bake Expressions"),
-        image: w12_expression_baker
-    });
+    var animCreateBakeButton = addNativeCheckBox( animCreateEditor.content, i18n._("Bake Expressions"), w12_expression_baker );
 
-    animCreateNameEdit = DuScriptUI.editText(
+    // Native fields have no place holder, so the name has a label instead.
+    var animCreateNameEdit = addNativeEditText(
         animCreateEditor.content,
         '',
+        undefined,
         '',
-        '',
-        i18n._("Animation name")
+        i18n._("Animation name") + ':'
     );
+    animCreateNameEdit.characters = 16;
 
-    var animCreateOKButton = DuScriptUI.button(
+    var animCreateOKButton = addNativeButton(
         animCreateEditor.content,
         i18n._("OK"),
         DuScriptUI.Icon.CHECK,
-        i18n._("Save animation."),
-        false,
-        'row',
-        'center'
+        i18n._("Save animation.")
     );
     animCreateOKButton.onClick = function() {
         var newName = animCreateNameEdit.text;
@@ -543,7 +485,7 @@ function buildAnimationLibPanel( animationLibGroup ) {
 
         // Bake expressions
         var props = DuAEComp.getSelectedProps();
-        if (animCreateBakeButton.checked) {
+        if (animCreateBakeButton.value) {
             for (var i = 0, n = props.length; i < n; i++) {
                 var p = new DuAEProperty(props[i]);
                 p.bakeExpressions(DuAEExpression.BakeAlgorithm.PRECISE, 1.0);
@@ -564,18 +506,17 @@ function buildAnimationLibPanel( animationLibGroup ) {
         lib.refresh();
     };
 
-    var animEditorPopup = DuScriptUI.popUp( i18n._("Animation settings.") );
+    var animEditorPopup = addNativePopup( i18n._("Animation settings.") );
     animEditorPopup.content.alignment = ['fill','top'];
     animEditorPopup.editing = null;
 
-    var animEditorButtonsGroup = DuScriptUI.toolBar(animEditorPopup.content);
+    var animEditorButtonsGroup = addNativeToolBar(animEditorPopup.content, 2, 32, 32);
 
     var animEditorUpdateThumbButton = animEditorButtonsGroup.addButton(
         i18n._("Update thumbnail"),
         w16_update_thumbnail,
         i18n._("Updates the thumbnail for the selected item.")
     );
-    animEditorUpdateThumbButton.alignment = ['center', 'top'];
     animEditorUpdateThumbButton.onClick = function() {
         if (!animEditorPopup.editing) return;
         var folderPath = animEditorPopup.editing.parent.absoluteURI;
@@ -594,7 +535,6 @@ function buildAnimationLibPanel( animationLibGroup ) {
         w16_update_anim,
         i18n._("Updates the current animation.")
     );
-    animEditorUpdateAnimButton.alignment = ['center', 'top'];
     animEditorUpdateAnimButton.onClick = function() {
         if (!animEditorPopup.editing) return;
         DuIO.Animation.toJson(animEditorPopup.editing);
@@ -603,14 +543,16 @@ function buildAnimationLibPanel( animationLibGroup ) {
     };
 
     // For now, can't move between categories. Just move them from their folders
-    var animEditorCatSelector = DuScriptUI.selector(animEditorPopup.content);
+    var animEditorCatSelector = addNativeValueSelector(animEditorPopup.content, []);
     animEditorCatSelector.onChange = function () {
+        // Only when a category is picked, not when the list is filled.
+        if (animEditorCatSelector.freeze) return;
         if (!animEditorPopup.editing) return;
 
         // Keep prev path to update lib metadata
         var oldURI = animEditorPopup.editing.absoluteURI;
 
-        var newFolder = animEditorCatSelector.currentData;
+        var newFolder = animEditorCatSelector.getValue();
         if (!newFolder) return;
         // Move file and thumb to the new folder
         var newFolderPath = newFolder.absoluteURI + '/';
@@ -626,7 +568,7 @@ function buildAnimationLibPanel( animationLibGroup ) {
         lib.refresh();
     };
 
-    var animEditorFavButton = DuScriptUI.checkBox(
+    var animEditorFavButton = addNativeCheckBox(
         animEditorPopup.content,
         i18n._("Favorite"),
         w12_fav
@@ -635,7 +577,7 @@ function buildAnimationLibPanel( animationLibGroup ) {
         if (!animEditorPopup.editing) return;
 
         var a = getCreateLibEntry( animEditorPopup.editing );
-        a.favorite = animEditorFavButton.checked;
+        a.favorite = animEditorFavButton.value;
         updateLibEntry(a);
 
         animEditorPopup.hide();
@@ -643,22 +585,21 @@ function buildAnimationLibPanel( animationLibGroup ) {
         lib.refresh();
     };
 
-    animEditorNameEdit = DuScriptUI.editText(
+    // Native fields have no place holder, so the name has a label instead.
+    var animEditorNameEdit = addNativeEditText(
         animEditorPopup.content,
         '',
+        undefined,
         '',
-        '',
-        i18n._("Animation name")
+        i18n._("Animation name") + ':'
     );
+    animEditorNameEdit.characters = 16;
 
-    var animEditorOKButton = DuScriptUI.button(
+    var animEditorOKButton = addNativeButton(
         animEditorPopup.content,
         i18n._("OK"),
         DuScriptUI.Icon.CHECK,
-        i18n._("Animation settings."),
-        false,
-        'row',
-        'center'
+        i18n._("Animation settings.")
     );
     animEditorOKButton.onClick = animEditorNameEdit.onChange = function() {
         if (!animEditorPopup.editing) return;
@@ -704,7 +645,7 @@ function buildAnimationLibPanel( animationLibGroup ) {
     libOptions.removeItemHelpTip = i18n._("Remove the selected animation or category from library.");
     libOptions.refreshButton = true;
    
-    var lib = DuScriptUI.library(
+    var lib = addNativeLibrary(
         animationLibGroup, // container
         animationLib, // library
         libOptions
@@ -766,7 +707,7 @@ function buildAnimationLibPanel( animationLibGroup ) {
             alert( i18n._("Sorry, we can't save an animation directly in the current category."));
             return;
         }
-        animCreateNameEdit.setText("");
+        animCreateNameEdit.text = "";
         animCreateEditor.show();
     };
 
@@ -813,7 +754,7 @@ function buildAnimationLibPanel( animationLibGroup ) {
     lib.onEditItem = function(item, category) {
         if (item.libType == 'item') {
             // Set name
-            animEditorNameEdit.setText( item.text );
+            animEditorNameEdit.text = item.text;
 
             // Editing
             animEditorPopup.editing = item.data;
@@ -823,23 +764,16 @@ function buildAnimationLibPanel( animationLibGroup ) {
             var cat = DuPath.getName( item.data.parent );
             if (cat == DuPath.getName(libFolder)) cat = i18n._("Uncategorized");
             
-            animEditorCatSelector.freeze = true;
-
-            animEditorCatSelector.clear();
-            animEditorCatSelector.addButton( i18n._("Uncategorized"), w12_file);
-            
+            var catItems = [ [i18n._("Uncategorized"), w12_file] ];
             for (var i = 0; i < allCats.length; i++) {
-                var n = DuPath.getName( allCats[i] );
-                animEditorCatSelector.addButton( n, w12_folder, undefined, allCats[i] );
+                catItems.push( [DuPath.getName( allCats[i] ), w12_folder, allCats[i]] );
             }
-            
-            animEditorCatSelector.setCurrentText( cat );
-            
-            animEditorCatSelector.freeze = false;
+            animEditorCatSelector.setItems( catItems );
+            animEditorCatSelector.selectText( cat );
 
             // Set Fav
             var a = getCreateLibEntry( animEditorPopup.editing );
-            animEditorFavButton.setChecked( a.favorite );
+            animEditorFavButton.value = a.favorite;
 
             animEditorPopup.show();
         }

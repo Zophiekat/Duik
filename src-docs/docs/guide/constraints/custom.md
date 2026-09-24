@@ -35,6 +35,8 @@ You can duplicate the effect to stack several copy location constraints on the s
 
 The target is set in the ***Constraint settings***, opened with the ![](../../img/duik/icons/settings.svg){style="width:1em;"} gear button in the toolbar at the top of the panel. Select the constrained layers, pick a **Target Composition** and a **Target Layer**, and click ***Set target***. The same panel shows what each constraint of the selection currently points at, so you can check a rig without opening the expressions.
 
+The [point constraints](#copy-point-location) also need a **Target Path**: the list shows the paths of the target layer, the shape paths with the groups they're in (`Contents / Group 1 / Path 1`), and the masks (`Masks / Mask 1`). Picking another target layer keeps the path at the same place when the new layer has one, and takes its first path otherwise. Its eyedropper takes the path selected in the timeline: select the constraint effect, then `[Ctrl]` / `[Cmd]` + click the path, or its mask, on the target layer. The list is greyed out for the constraints which don't target a path.
+
 A newly created constraint has no target and does nothing until you set one.
 
 !!! tip
@@ -48,10 +50,18 @@ A newly created constraint has no target and does nothing until you set one.
     var DUIK_TARGETS = {"Copy Location":["Character","Head"],"Copy Location.001":["Props","Hat"]};
     ```
 
+    A point constraint adds the address of its path in the target layer: the names of the groups and of the path, and the match names of what After Effects names by itself, so that it works in any language.
+
+    ```js
+    var DUIK_TARGETS = {"Copy Point Location":["Character","Body",["ADBE Root Vectors Group","Group 1","ADBE Vectors Group","Path 1","ADBE Vector Shape"]]};
+    ```
+
+    When two groups or paths side by side have the same name, the address uses the index of the right one instead, since an expression only finds the first one by name.
+
     That line is plain enough to edit by hand if you'd rather retarget that way.
 
 !!! warning
-    The target is found by name, and the key is the name of the effect. So: don't rename the constraint effects, and set the target again after renaming a target composition or a target layer. Give your compositions unique names too — an expression reaches a composition only by name.
+    The target is found by name, and the key is the name of the effect. So: don't rename the constraint effects, and set the target again after renaming a target composition, a target layer, or the target path and the groups it's in. Give your compositions unique names too — an expression reaches a composition only by name.
 
 !!! note
     When the target is in another composition, its position and rotation are read in *that composition's* space; the constraint doesn't know how, or whether, that composition is nested into this one. **Transform units** on the copy location constraint is there to map the coordinates the way you want. If you need a layer to follow a precomp's content through the precomp layer's own transform, use [parent across compositions](parent.md) instead, which is built for that.
@@ -101,6 +111,53 @@ You can duplicate the effect to stack several copy rotation constraints on the s
 - **No winding on 3D layers.** The angles a 3D layer gets are the smallest ones giving its rotation, between `-180` and `180` degrees: the three expressions each compute the whole rotation, and they have to pick the same angles to agree. A 2D layer keeps its turns, as above.
 - **Mirrors.** Blender reads a mirrored transformation as a rotation with a negative scale on all three axis. Duik reads it as seen on screen, as a rotation with its X axis flipped, on 2D and 3D layers alike. A **Custom space** layer only turns the rotations: whether it's mirrored or not doesn't change them.
 - **Skew.** When a parent is scaled unevenly and turned, the rotation is read along the layer's X axis, where Blender, built for bones, reads it along Y.
+
+## ![](../../img/duik/icons/vertexsel.svg){style="width:1em;"} Copy Point Location
+
+A [copy location constraint](#copy-location) whose target is a point of a Bézier path instead of a layer: one of its vertices, or one of the two handles of this vertex. The layer sticks to the vertex wherever the path goes, whether the path is animated, deformed by [Armature Deform](armature-deform.md) or morphed by the [Pose Shape Interpolator](pose-shape-interpolator.md).
+
+Select the layers to constrain and click ![](../../img/duik/icons/vertexsel.svg){style="width:1em;"} ***Copy Point Location*** in the ***Custom Constraints...*** menu, then set its target in the ***Constraint settings***: a **Target Composition**, a **Target Layer**, and a **Target Path** of that layer — see [choosing the target](#choosing-the-target). The path can be a shape path, in any group of a shape layer, or a mask. The effect is named `Copy Point Location`, and `Copy Point Location.001`, `Copy Point Location.002`... for the next ones on the same layer.
+
+- **Point Index**: the vertex to copy. The first vertex of the path, the one After Effects shows as its *First Vertex*, is `0`. The index wraps around a closed path — on a path of four vertices, `4` is the first vertex again and `-1` the last one — and stops at the ends of an open path. It's rounded to the nearest vertex, and can be animated: its keyframes hold by default.
+- **Target Component**: the part of the vertex to copy. ***Point*** copies the location of the vertex itself. ***Handle Left*** and ***Handle Right*** copy the location of the end of its incoming and outgoing handles, the tangents before and after the vertex, in the direction the path goes. A retracted handle is on the vertex.
+- **Transform units**, **Axis**, **Offset**, **Target space**, **Owner space** and **Influence** work as they do on the [copy location constraint](#copy-location).
+
+The point is where you see it: the position, anchor point, scale, skew and rotation of all the groups holding the path are taken into account, as well as the transformation of the layer and its parents.
+
+In **Local Space**, the point is read relative to the parent of the path layer, the way Blender reads a vertex group relative to the parent of its object. To read it in the coordinates of the path layer itself, choose ***Custom Space*** and set the path layer as the **Custom space**.
+
+The copy location and copy point location constraints share their expression, so you can stack them on the same layer, in any order: they're evaluated from top to bottom, together.
+
+!!! note
+    The constraint is computed live by an expression: it doesn't need any keyframe, and updates as soon as the path or its layer moves.
+
+### Differences with Blender
+
+- Blender's closest equivalent is the **Vertex Group** field of its *Copy Location* constraint, with a mesh target: it copies the median point of a group of vertices. After Effects paths have no vertex groups, so the vertex is picked by its index, and **Target Component** is Duik's own, to reach the handles.
+
+## ![](../../img/duik/icons/con_followpath.svg){style="width:1em;"} Copy Point Rotation
+
+The companion of the [copy point location constraint](#copy-point-location): a [copy rotation constraint](#copy-rotation) whose target is a point of a Bézier path, turned along the path. The layer follows the curvature of the path at one of its vertices: its X axis goes along the tangent of the path, the way the path goes from its first vertex to its last, and its Y axis along the normal — like the auto-orientation of the [path constraint](transform.md#path-constraint), at a vertex, and with all the options of the copy rotation constraint.
+
+Select the layers to constrain and click ![](../../img/duik/icons/con_followpath.svg){style="width:1em;"} ***Copy Point Rotation*** in the ***Custom Constraints...*** menu, then set its **Target Composition**, **Target Layer** and **Target Path** in the ***Constraint settings***. Add a copy point location constraint with the same target and the same index to stick the layer to the vertex too.
+
+- **Point Index**: the vertex, as on the [copy point location constraint](#copy-point-location).
+- **Tangent**: at a smooth vertex, the path goes the same way on both sides. At a corner, ***Average*** takes the direction halfway between the two sides, ***Handle Left*** the direction the path comes in along, and ***Handle Right*** the direction it leaves along. A retracted handle has no direction: the tangent then goes toward the next control point, the way the curve actually leaves the vertex. At the ends of an open path, the only side there is is used, whatever the choice.
+- **Euler order**, **Axis**, **Mix mode**, **Target space**, **Owner space** and **Influence** work as they do on the [copy rotation constraint](#copy-rotation), on 2D and 3D layers alike.
+
+The point turns like a child layer of the path layer would, placed on the vertex and turned along the tangent. It turns with the path layer and its parents, keeps their turns on 2D layers, and follows them when they're mirrored the same way a child layer does: a rig flipped by its root keeps its constrained layers turned the right way. The tangent itself is read as seen on screen, so it's followed even when the path layer, or a group of the shape layer, is scaled unevenly or skewed. On a 3D layer, the Z axis of the point is the one of the path layer, square to the plane the path is drawn in.
+
+In **Local Space**, the rotation is read relative to the parent of the path layer, as for the copy point location constraint.
+
+The copy rotation and copy point rotation constraints share their expressions, so you can stack them on the same layer, in any order: they're evaluated from top to bottom, together.
+
+!!! note
+    On a 2D layer, the angle of the tangent is read between `-180` and `180` degrees from the X axis of the path layer. A tangent turning past the opposite of that axis makes the angle jump by a full turn: the layer looks the same, but motion blur, an **Influence** below `100 %`, or the ***Add***, ***Before Original*** and ***After Original*** mix modes show it. The turns of the path layer itself are kept.
+
+### Differences with Blender
+
+- With a mesh target and a **Vertex Group**, Blender's *Copy Rotation* turns the layer along the normal of the surface at the vertices. A path has no surface, so Duik turns it along the tangent of the path and its normal in the plane of the path, the way Blender's *Follow Path* constraint does with *Follow Curve*.
+- The vertex is picked by its index, and **Tangent** is Duik's own, to choose a side at the corners.
 
 ## ![](../../img/duik/icons/con_armature.svg){style="width:1em;"} Armature
 

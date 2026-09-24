@@ -6,6 +6,9 @@
 // True while a modal dialog opened from an options popup is shown, so that the popup stays open.
 var nativeDialogOpen = false;
 
+// The tabs of all the native tab panels, built at launch by nativeBuildTabs.
+var nativeTabs = [];
+
 /**
  * The height of the native buttons in pixels, or 0 to let ScriptUI size them.<br />
  * This is the fallback for the whole script: size the buttons of one panel with

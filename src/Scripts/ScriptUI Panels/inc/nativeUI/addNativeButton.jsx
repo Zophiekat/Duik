@@ -15,11 +15,14 @@
  * The button builds them before running its callbacks, through <code>onOptions(false)</code> and the popup.
  * @param {Boolean} [options.optionsWithoutPanel=false] - The options aren't in a popup: <code>onOptions(true)</code> shows them.
  * @param {Boolean} [options.optionsWithoutButton=false] - The options popup has no button running the action.
+ * @param {string} [options.optionsButtonText] - The text of the button of the options popup running the action,
+ * like "Create". The text of the button by default.
  * @param {int} [options.height] - The height of the button in pixels, {@link nativeButtonHeight} by default. 0 lets ScriptUI size it.
  * @param {int} [options.width] - The width of the button in pixels. 0, the default, lets the layout size it.
  * @return {Group} The button. Its <code>control</code> is the native button, its <code>optionsPopup</code> the popup
  * from {@link addNativeOptionsPopup}, and <code>screenX</code> and <code>screenY</code> its location on screen,
- * known from the latest click. In a grid, its <code>iconCell</code> is the cell with its options button and image.
+ * known from the latest click. In a grid, it's the row, and its <code>iconCell</code> is the cell with its options
+ * button and image, beside the native button.
  */
 function addNativeButton(container, text, image, helpTip, options) {
     image = def(image, null);
@@ -36,16 +39,18 @@ function addNativeButton(container, text, image, helpTip, options) {
 
     if (hasOptions) helpTip += (helpTip == '' ? '' : '\n\n') + i18n._("[Shift]: More options...");
 
-    // In a grid of buttons, the options button and the image are in the first column, and the button in the second one.
+    // In a grid of buttons, the options button and the image are in the first cell of the row, and the button fills the rest.
     var grid = container.isButtonGrid && !cell ? container : null;
 
     var button;
     var iconCell;
     if (grid) {
-        iconCell = addNativeGroup(grid.iconColumn, 'row');
-        iconCell.alignment = ['right', 'center'];
-        button = addNativeGroup(grid.buttonColumn, 'row');
+        button = addNativeGroup(grid, 'row');
         button.alignment = ['fill', 'center'];
+        button.spacing = 4;
+        iconCell = addNativeGroup(button, 'row');
+        iconCell.alignment = ['left', 'center'];
+        iconCell.alignChildren = ['right', 'center'];
         button.iconCell = iconCell;
     }
     else {
@@ -71,7 +76,7 @@ function addNativeButton(container, text, image, helpTip, options) {
 
     if (hasOptions) {
         if (!def(options.optionsWithoutPanel, false))
-            button.optionsPopup = addNativeOptionsPopup(button, text, !def(options.optionsWithoutButton, false));
+            button.optionsPopup = addNativeOptionsPopup(button, text, !def(options.optionsWithoutButton, false), options.optionsButtonText);
 
         // Like Duik's buttons, a small button shows the options; cells, like the ones of tool bars, only have [Shift] + [Click].
         if (!cell) {
@@ -132,21 +137,9 @@ function addNativeButton(container, text, image, helpTip, options) {
     }
     if (buttonHeight > 0) button.control.preferredSize.height = buttonHeight;
 
-    if (grid) {
-        // Both cells of a row get the same height, so that the columns line up:
-        // the custom height, or the height of the tallest control of the row.
-        var height = buttonHeight;
-        if (height <= 0) {
-            height = button.control.preferredSize[1];
-            for (var i = 0, n = iconCell.children.length; i < n; i++)
-                height = Math.max(height, iconCell.children[i].preferredSize[1]);
-        }
-        if (height > 0) {
-            iconCell.minimumSize.height = iconCell.maximumSize.height = height;
-            button.minimumSize.height = button.maximumSize.height = height;
-        }
-    }
-    else if (buttonHeight > 0) button.minimumSize.height = button.maximumSize.height = buttonHeight;
+    // The first cells of the rows of a grid line up.
+    if (grid) grid.alignCell(iconCell);
+    if (buttonHeight > 0) button.minimumSize.height = button.maximumSize.height = buttonHeight;
 
     button.showOptions = function() {
         if (button.optionsPopup) button.optionsPopup.show([button.screenX, button.screenY]);

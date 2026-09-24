@@ -26,7 +26,7 @@ function addNativeDropdown(container, items, index, height) {
     list.helpTip = tips.join('\n\n');
 
     if (index < 0 || index >= items.length) index = 0;
-    list.selection = index;
+    if (items.length > 0) list.selection = index;
 
     return list;
 }

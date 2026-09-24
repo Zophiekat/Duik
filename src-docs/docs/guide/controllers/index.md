@@ -54,6 +54,7 @@ Among all these controller shapes, some are a bit specific.
 
 - The ![](../../img/duik/icons/slider.svg){style="width:1em;"} ***Slider***, ![](../../img/duik/icons/2d_slider.svg){style="width:1em;"} ***2D Slider*** and ![](../../img/duik/icons/angle.svg){style="width:1em;"} ***Angle*** controllers are not meant to be used like other controllers - with parenting or IKs, etc. - but with the [Connector](../constraints/connector.md)&nbsp;[^5] or expressions: it is easy to get and connect their value to any other property and control almost anything you want with them, in a very visual and easy way.
 - The ![](../../img/duik/icons/ae_null.svg){style="width:1em;"} ***AE Null*** button doesn't create an actual shape but an After Effects null layer to be used as any other controller.
+- The ![](../../img/duik/icons/handle_aligned.svg){style="width:1em;"} ***Bezier Point*** controller is made of three controllers: the *Point*, and its *Handle Left* and *Handle Right*, 100 px away from it on +X and −X. Each handle is parented to the Point through a [zero](../constraints/tools/zero.md), and draws a circle, and a line from the Point which stops at the edge of the circle (a *Merge Paths* in *Subtract* mode cuts it, and an instance of the circle draws the circle again). The Point draws a 16-point Bézier circle whose top point is moved 20 px up. These controllers are always shape layers, whatever the [controller settings](tools/settings.md)&nbsp;[^2] say, and [baking](tools/bake.md)&nbsp;[^4] them keeps their expressions, as the lines need them to follow the Point.
 
 ### Tools
 
@@ -71,6 +72,7 @@ The toolbar at the top of the bones panel gives a quick access to several second
     - [Tag](tools/tag.md)
     - [Bake controllers](tools/bake.md)
     - [Controller settings](tools/settings.md)
+    - [Path spreadsheet](tools/path-spreadsheet.md)
 
 [^1]: *cf.* *[Bones and Auto-Rig](../bones/index.md)* / *[Auto-Rig](../bones/autorig/index.md)*.
 

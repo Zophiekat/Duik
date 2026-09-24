@@ -5,26 +5,23 @@ function buildScriptEditorUI( container ) {
     container.editText.alignment = ['fill', 'fill'];
 
     var content = DuESF.scriptSettings.get("scriptEditorContent",
-        "/* Write your script here!\n\n" + 
-        "   Note that you can use the Duik API inside this editor,\n" + 
-        "   Its comprehensive reference is available at http://duik.rxlab.io\n*/ \n\n" + 
-        "// Opens the donation page for RxLab to support us:\n" + 
-        "DuSystem.openURL( DuESF.donateURL );\n\n" + 
-        "// Opens the API comprehensive reference:\n" + 
+        "/* Write your script here!\n\n" +
+        "   Note that you can use the Duik API inside this editor,\n" +
+        "   Its comprehensive reference is available at http://duik.rxlab.io\n*/ \n\n" +
+        "// Opens the donation page for RxLab to support us:\n" +
+        "DuSystem.openURL( DuESF.donateURL );\n\n" +
+        "// Opens the API comprehensive reference:\n" +
         "DuSystem.openURL( 'http://duik.rxlab.io' );\n\n");
 
     container.editText.text = content;
 
-    DuScriptUI.separator( container ).alignment = ['fill', 'bottom'];
+    addNativeSeparator( container ).alignment = ['fill', 'bottom'];
 
-    var runButton = DuScriptUI.button(
+    var runButton = addNativeButton(
         container,
         i18n._("Run script"),
         w12_automation,
-        i18n._("Run script"),
-        false,
-        'row',
-        'center'
+        i18n._("Run script")
     );
     runButton.alignment = ['fill', 'bottom'];
     runButton.onClick = function() {
@@ -35,5 +32,6 @@ function buildScriptEditorUI( container ) {
         DuDebug.safeRun(theScript);
     }
 
-    DuScriptUI.showUI(container);
+    // Laid out with the rest of the UI when it's built before the UI is shown.
+    if (DuScriptUI.uiShown) nativeLayout(container);
 }

@@ -28,29 +28,38 @@ function addNativeToolBar(container, numCols, height, width, showLabels) {
 
     // ScriptUI has no grid layout: each column is sized by its own widest cell, so without
     // this the cells of a row don't line up with the ones of the rows above and below.
-    function alignCells() {
-        var w = 0;
-        var h = 0;
-        var i, j, cells;
-        for (i = 0; i < numCols; i++) {
-            cells = columns[i].children;
-            for (j = 0; j < cells.length; j++) {
-                w = Math.max(w, cells[j].preferredSize[0]);
-                h = Math.max(h, cells[j].preferredSize[1]);
-            }
+    // Every cell gets the size of the biggest one. A size set for the buttons wins over the measured one:
+    // they have already been pinned to it, and a measured minimum bigger than that maximum would fight it.
+    var fixed = nativeLayoutSize(toolBar);
+    var cells = [];
+    var cellSize = [0, 0];
+
+    // Stretching groups double the time ScriptUI takes to lay the UI out: when the buttons have a set size,
+    // the columns and the cells don't need to stretch.
+    var fixedSize = fixed.width > 0 && fixed.height > 0;
+    var cellAlignment = fixedSize ? ['left', 'top'] : ['fill', 'top'];
+    if (fixedSize) toolBar.alignChildren = ['left', 'top'];
+
+    function alignCell(cell) {
+        cells.push(cell);
+
+        var w = fixed.width;
+        var h = fixed.height;
+        // Measuring a group lays it out, which is slow: only the new cell is measured, and only when
+        // the tool bar doesn't set the size.
+        if (w <= 0 || h <= 0) {
+            var size = cell.preferredSize;
+            if (w <= 0) w = size[0];
+            if (h <= 0) h = size[1];
         }
         if (w <= 0 || h <= 0) return;
 
-        // A size set for the buttons wins over the measured one: they have already been pinned to it,
-        // and a measured minimum bigger than that maximum would fight it.
-        var fixed = nativeLayoutSize(toolBar);
-        if (fixed.height > 0) h = fixed.height;
-        if (fixed.width > 0) w = fixed.width;
-
-        for (i = 0; i < numCols; i++) {
-            cells = columns[i].children;
-            for (j = 0; j < cells.length; j++) cells[j].minimumSize = [w, h];
+        if (w > cellSize[0] || h > cellSize[1]) {
+            // A bigger cell: all the cells grow to its size.
+            cellSize = [Math.max(w, cellSize[0]), Math.max(h, cellSize[1])];
+            for (var i = 0; i < cells.length; i++) cells[i].minimumSize = [cellSize[0], cellSize[1]];
         }
+        else cell.minimumSize = [cellSize[0], cellSize[1]];
     }
 
     toolBar.addButton = function(text, image, helpTip, addOptions, optionsWithoutPanel) {
@@ -60,10 +69,10 @@ function addNativeToolBar(container, numCols, height, width, showLabels) {
             options: addOptions,
             optionsWithoutPanel: optionsWithoutPanel
         });
-        button.alignment = ['fill', 'top'];
+        button.alignment = cellAlignment;
 
         currentCol = (currentCol + 1) % numCols;
-        alignCells();
+        alignCell(button);
 
         return button;
     };

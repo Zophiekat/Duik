@@ -4,13 +4,13 @@ function buildCmdPanel( container, standAlone ) {
 
     if (!standAlone) {
         // A Spacer
-        var spacer = tab.add('group');
+        var spacer = container.add('group');
         spacer.margins = 0;
         spacer.spacing = 0;
         spacer.size = [-1,3];
 
         // A title
-        DuScriptUI.staticText( tab, i18n._("Command line") ).alignment = ['center', 'top'];
+        container.add('statictext', undefined, i18n._("Command line")).alignment = ['center', 'top'];
     }
 
     // Adjust lib
@@ -33,9 +33,9 @@ function buildCmdPanel( container, standAlone ) {
     var libOptions = {};
     libOptions.folderButton = false;
     libOptions.editListButtons = false;
-    libOptions.defaultItemIcon = w12_cmd.binAsString;
+    libOptions.defaultItemIcon = nativeImage(w12_cmd);
 
-    var lib = DuScriptUI.library(
+    var lib = addNativeLibrary(
         container,
         Duik.CmdLib,
         libOptions

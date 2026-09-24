@@ -16,6 +16,11 @@ from _config import SRC_PATH
 from rxbuilder_ import ffx
 
 SPECS_PATH = os.path.join(os.path.dirname(__file__), 'pseudo_effects')
+
+# After Effects refuses to apply a pseudo effect whose match name is too long, without
+# telling why: "Pseudo/DUIK copyPointLocation v2" (32 characters) failed. None of the match
+# names known to work is longer than this.
+MAX_MATCHNAME_LENGTH = 30
 PE_PATH = os.path.join(SRC_PATH, 'Scripts', 'ScriptUI Panels', 'inc', 'pe')
 
 
@@ -25,6 +30,9 @@ def build_spec(spec_path):
         spec = json.load(spec_file)
 
     name = spec.get('file', os.path.basename(spec_path).replace('.json', ''))
+    if len(spec['matchname']) > MAX_MATCHNAME_LENGTH:
+        raise ValueError('%s: the match name %r is longer than %d characters'
+                         % (name, spec['matchname'], MAX_MATCHNAME_LENGTH))
     data = ffx.build(spec['controlName'], spec['matchname'], spec['controlArray'])
 
     ffx_path = os.path.join(PE_PATH, name + '.ffx')

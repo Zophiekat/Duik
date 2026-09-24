@@ -100,6 +100,7 @@ nav:
                     - Tag: guide/controllers/tools/tag.md
                     - Bake: guide/controllers/tools/bake.md
                     - Settings: guide/controllers/tools/settings.md
+                    - Path Spreadsheet: guide/controllers/tools/path-spreadsheet.md
         - Automation & Expressions:
             - Introduction: guide/automation/index.md
             - Kleaner: guide/automation/kleaner.md

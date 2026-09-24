@@ -4,11 +4,11 @@ var mainScriptFile = new File($.fileName);
 
 #include "inc/core.jsx"
 
-var mainStack = DuScriptUI.group(ui.mainGroup, 'stacked' );
+var mainStack = addNativeGroup(ui.mainGroup, 'stack' );
 mainStack.alignment = ['fill','fill'];
-var libGroup = DuScriptUI.group(mainStack, 'column');
+var libGroup = addNativeGroup(mainStack, 'column');
 libGroup.alignment = ['fill','fill'];
-var editorGroup = DuScriptUI.group(mainStack, 'column');
+var editorGroup = addNativeGroup(mainStack, 'column');
 editorGroup.alignment = ['fill','fill'];
 editorGroup.visible = false;
 
@@ -16,7 +16,7 @@ editorGroup.visible = false;
 buildScriptLibPanel( libGroup, editorGroup );
 
 #include "inc/scriptEditorPanel.jsx"
-createSubPanel(
+addNativeSubPanel(
     editorGroup,
     DuScriptUI.String.SCRIPT_LIB,
     libGroup,

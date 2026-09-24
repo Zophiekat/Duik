@@ -31,6 +31,8 @@
 #include "../pe/pe_position.ffx.jsxinc"
 #include "../pe/pe_copy_location.ffx.jsxinc"
 #include "../pe/pe_copy_rotation.ffx.jsxinc"
+#include "../pe/pe_copy_point_location.ffx.jsxinc"
+#include "../pe/pe_copy_point_rotation.ffx.jsxinc"
 #include "../pe/pe_armature.ffx.jsxinc"
 #include "../pe/pe_armature_deform.ffx.jsxinc"
 #include "../pe/pe_pose_shape_interpolator.ffx.jsxinc"
@@ -114,6 +116,8 @@ Duik.PseudoEffect = {
     POSITION: new DuAEPseudoEffect(pe_position),
     COPY_LOCATION: new DuAEPseudoEffect(pe_copy_location),
     COPY_ROTATION: new DuAEPseudoEffect(pe_copy_rotation),
+    COPY_POINT_LOCATION: new DuAEPseudoEffect(pe_copy_point_location),
+    COPY_POINT_ROTATION: new DuAEPseudoEffect(pe_copy_point_rotation),
     ARMATURE: new DuAEPseudoEffect(pe_armature),
     ARMATURE_DEFORM: new DuAEPseudoEffect(pe_armature_deform),
     POSE_SHAPE_INTERPOLATOR: new DuAEPseudoEffect(pe_pose_shape_interpolator),

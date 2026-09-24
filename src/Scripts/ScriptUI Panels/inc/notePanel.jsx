@@ -97,7 +97,7 @@ function buildNotePanelUI( container )
     var notePanel;
     var contentGroup;
     if (!container) {
-        notePanel = DuScriptUI.popUp( "Notes", ['fill','fill'] );
+        notePanel = addNativePopup( "Notes", ['fill','fill'] );
         contentGroup = notePanel.content;
     }
     else {
@@ -106,32 +106,35 @@ function buildNotePanelUI( container )
     }
     notePanel.reload = reload;
 
-    var topGroup = DuScriptUI.group( contentGroup, 'row' );
+    var topGroup = addNativeGroup( contentGroup, 'row' );
+    topGroup.alignment = ['fill', 'top'];
 
-    var noteSelector = DuScriptUI.selector( topGroup );
-    noteSelector.addButton(
-        i18n._("Project"),
-        w16_project,
-        i18n._("Set a note for the current project")
-    );
-    noteSelector.addButton(
-        i18n._("Composition"),
-        w16_composition,
-        i18n._("Set a note for the current composition")
-    );
-    noteSelector.addButton(
-        i18n._("Text file"),
-        w16_file,
-        i18n._("Select the file where to save the notes.")
-    );
+    var noteSelector = addNativeDropdown( topGroup, [
+        [
+            i18n._("Project"),
+            w16_project,
+            i18n._("Set a note for the current project")
+        ],
+        [
+            i18n._("Composition"),
+            w16_composition,
+            i18n._("Set a note for the current composition")
+        ],
+        [
+            i18n._("Text file"),
+            w16_file,
+            i18n._("Select the file where to save the notes.")
+        ]
+    ], DuESF.scriptSettings.get("noteType", 0) );
     noteSelector.onChange = function()
     {
-        DuESF.scriptSettings.set("noteType", noteSelector.index);
+        if (!noteSelector.selection) return;
+        DuESF.scriptSettings.set("noteType", noteSelector.selection.index);
         DuESF.scriptSettings.save();
         reload();
     }
 
-    var refreshButton = DuScriptUI.button(
+    var refreshButton = addNativeButton(
         topGroup,
         '',
         DuScriptUI.Icon.UPDATE,
@@ -145,27 +148,26 @@ function buildNotePanelUI( container )
     noteEdit.alignment = ['fill','fill'];
     noteEdit.minimumSize = [200, 300];
 
-    var noteBottomGroup = DuScriptUI.group( contentGroup, 'row');
+    var noteBottomGroup = addNativeGroup( contentGroup, 'row');
     noteBottomGroup.alignment = ['fill','bottom'];
 
-    var typeGroup = DuScriptUI.group( noteBottomGroup, 'stacked' );
+    var typeGroup = addNativeGroup( noteBottomGroup, 'stack' );
     typeGroup.alignment = ['fill', 'fill'];
 
-    var labelGroup = DuScriptUI.group( typeGroup, 'row' );
+    var labelGroup = addNativeGroup( typeGroup, 'row' );
+    labelGroup.alignment = ['fill', 'fill'];
 
-    var label = DuScriptUI.staticText( labelGroup, '' );
-    label.alignment = ['fill', 'fill'];
+    var label = labelGroup.add( 'statictext', undefined, '' );
+    label.alignment = ['fill', 'center'];
+    label.setText = function( text ) { label.text = text; };
 
-    var fileGroup =  DuScriptUI.group( typeGroup, 'row' );
-    
-    var fileButton = DuScriptUI.button(
+    var fileGroup = addNativeGroup( typeGroup, 'row' );
+
+    var fileButton = addNativeButton(
         fileGroup,
         i18n._p("file", "Open..."),
         w16_file,
-        i18n._("Select the file where to save the notes."),
-        false,
-        undefined,
-        undefined
+        i18n._("Select the file where to save the notes.")
     );
     fileButton.alignment = ['left', 'bottom'];
     fileButton.onClick = function()
@@ -181,14 +183,11 @@ function buildNotePanelUI( container )
 		}
 	};
 
-    var saveAsButton = DuScriptUI.button(
+    var saveAsButton = addNativeButton(
         fileGroup,
         i18n._p("file", "Save as..."),
         w16_file,
-        i18n._("Select the file where to save the notes."),
-        false,
-        undefined,
-        undefined
+        i18n._("Select the file where to save the notes.")
     );
     saveAsButton.alignment = ['left', 'bottom'];
     saveAsButton.onClick = function()
@@ -204,8 +203,8 @@ function buildNotePanelUI( container )
 		}
 	};
 
-    //get back the saved text
-	noteSelector.setCurrentIndex( reload() );
+    //get back the saved text; the selector already shows the saved type.
+	reload();
 
     //when text edited
 	noteEdit.onChange = save;

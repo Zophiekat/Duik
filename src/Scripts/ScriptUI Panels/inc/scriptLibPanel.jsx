@@ -416,22 +416,25 @@ function buildScriptLibPanel( scriptLibGroup, scriptEditorGroup ) {
     }
 
     // Popups
-    var catNameEditor = DuScriptUI.stringPrompt(
+    var catNameEditor = addNativeStringPrompt(
         i18n._("Edit category name"),
         i18n._("New Category")
     );
 
-    var scriptSettingsEditor = DuScriptUI.popUp( i18n._("Script settings") );
+    var scriptSettingsEditor = addNativePopup( i18n._("Script settings") );
     scriptSettingsEditor.content.alignment = ['fill','top'];
     scriptSettingsEditor.editing = null;
-    var scriptSettingsCatSelector = DuScriptUI.selector(scriptSettingsEditor.content);
+    var scriptSettingsCatSelector = addNativeValueSelector(scriptSettingsEditor.content, []);
     scriptSettingsCatSelector.onChange = function() {
+        // Only when a category is picked, not when the list is filled.
+        if (scriptSettingsCatSelector.freeze) return;
         if (!scriptSettingsEditor.editing) return;
+        if (!scriptSettingsCatSelector.selection) return;
 
         var f = scriptSettingsEditor.editing;
 
         var catName = "";
-        if (scriptSettingsCatSelector.index > 0) catName = scriptSettingsCatSelector.text;
+        if (scriptSettingsCatSelector.selection.index > 0) catName = scriptSettingsCatSelector.selection.text;
 
         // set cat in settings
         var ok = false;
@@ -456,7 +459,7 @@ function buildScriptLibPanel( scriptLibGroup, scriptEditorGroup ) {
         // Refresh list
         lib.refresh();
     };
-    var scriptSettingsIconSelector = DuScriptUI.fileSelector(
+    var scriptSettingsIconSelector = addNativeFileSelector(
         scriptSettingsEditor.content,
         i18n._("Select icon") + "...",
         false,
@@ -495,7 +498,7 @@ function buildScriptLibPanel( scriptLibGroup, scriptEditorGroup ) {
         // Refresh list
         lib.refresh();
     };
-    var scriptSettingsFavButton = DuScriptUI.checkBox(
+    var scriptSettingsFavButton = addNativeCheckBox(
         scriptSettingsEditor.content,
         i18n._("Favorite"),
         w12_fav
@@ -504,28 +507,27 @@ function buildScriptLibPanel( scriptLibGroup, scriptEditorGroup ) {
         if (!scriptSettingsEditor.editing) return;
 
         var s = getCreateLibEntry( scriptSettingsEditor.editing );
-        s.favorite = scriptSettingsFavButton.checked;
+        s.favorite = scriptSettingsFavButton.value;
         updateLibEntry(s);
 
         if (!scriptSettingsEditor.pinned) scriptSettingsEditor.hide();
 
         lib.refresh();
     };
-    scriptSettingsNameEditor = DuScriptUI.editText(
+    // Native fields have no place holder, so the name has a label instead.
+    var scriptSettingsNameEditor = addNativeEditText(
         scriptSettingsEditor.content,
         '',
+        undefined,
         '',
-        '',
-        i18n._("Script name")
+        i18n._("Script name") + ':'
     );
-    var scriptSettingsOKButton = DuScriptUI.button(
+    scriptSettingsNameEditor.characters = 16;
+    var scriptSettingsOKButton = addNativeButton(
         scriptSettingsEditor.content,
         i18n._("OK"),
         DuScriptUI.Icon.CHECK,
-        i18n._("Script settings"),
-        false,
-        'row',
-        'center'
+        i18n._("Script settings")
     );
     scriptSettingsOKButton.onClick = scriptSettingsNameEditor.onChange = function() {
         if (!scriptSettingsEditor.editing) return;
@@ -562,8 +564,8 @@ function buildScriptLibPanel( scriptLibGroup, scriptEditorGroup ) {
     }
 
     // setting to change the external editor
-    var editOptionsPopup = DuScriptUI.popUp( 'Options' );
-    var editorSelector = DuScriptUI.fileSelector(
+    var editOptionsPopup = addNativePopup( 'Options' );
+    var editorSelector = addNativeFileSelector(
         editOptionsPopup.content,
         i18n._("Open scripts with..."),
         true,
@@ -584,25 +586,24 @@ function buildScriptLibPanel( scriptLibGroup, scriptEditorGroup ) {
     editorSelector.setPlaceholder( i18n._("System default") );
 
     // Checkbox to use the Duik quick editor by default
-    var useDuikButton = DuScriptUI.checkBox(
+    var useDuikButton = addNativeCheckBox(
         editOptionsPopup.content,
         i18n._("Use the Duik quick editor."),
         undefined,
-        i18n._("Use the Duik quick script editor to edit the selected script.")
+        i18n._("Use the Duik quick script editor to edit the selected script."),
+        DuESF.scriptSettings.get("scriptLib/useDuikEditor", true )
     );
     useDuikButton.onClick = function() {
-        DuESF.scriptSettings.set("scriptLib/useDuikEditor", useDuikButton.checked);
+        DuESF.scriptSettings.set("scriptLib/useDuikEditor", useDuikButton.value);
         DuESF.scriptSettings.save();
     };
-    useDuikButton.setChecked( DuESF.scriptSettings.get("scriptLib/useDuikEditor", true ) );
 
-    DuScriptUI.separator(editOptionsPopup.content);
+    addNativeSeparator(editOptionsPopup.content);
 
-    var editApplyButton = DuScriptUI.button(
+    var editApplyButton = addNativeButton(
         editOptionsPopup.content,
         '',
-        w12_check,
-        ''
+        w12_check
     );
     editApplyButton.onClick = function() { lib.editDataButton.onClick(); editOptionsPopup.hide(); };
 
@@ -622,7 +623,7 @@ function buildScriptLibPanel( scriptLibGroup, scriptEditorGroup ) {
     libOptions.editDataButton = true;
     libOptions.defaultItemIcon = w12_script.binAsString;
 
-    var lib = DuScriptUI.library(scriptLibGroup, sLib, libOptions);
+    var lib = addNativeLibrary(scriptLibGroup, sLib, libOptions);
 
     lib.onRefresh = refreshLib;
 
@@ -655,7 +656,7 @@ function buildScriptLibPanel( scriptLibGroup, scriptEditorGroup ) {
     lib.onEditData = function(item) {
         var f = item.data;
 
-        if (!useDuikButton.checked) {
+        if (!useDuikButton.value) {
             // Check if an editor is selected and exists
             var editor = editorSelector.getFile();
             if (editor) DuProcess.run(editor, [f.fsName]);
@@ -761,7 +762,7 @@ function buildScriptLibPanel( scriptLibGroup, scriptEditorGroup ) {
     lib.onEditItem = function(item, category) {
         if (item.libType == 'item') {
             // Set name
-            scriptSettingsNameEditor.setText(item.text);
+            scriptSettingsNameEditor.text = item.text;
 
             // Editing
             var f = item.data;
@@ -770,18 +771,16 @@ function buildScriptLibPanel( scriptLibGroup, scriptEditorGroup ) {
             var s = getCreateLibEntry(f);
 
             // Set category
-            scriptSettingsCatSelector.clear();
-            scriptSettingsCatSelector.addButton("Uncategorized", w12_file );
+            var catItems = [ ["Uncategorized", w12_file] ];
             var cats = listCategories( '', true );
             for (var i = 0; i < cats.length; i++ ) {
-                scriptSettingsCatSelector.addButton(cats[i], w12_folder);
+                catItems.push( [cats[i], w12_folder] );
             }
-
-            if (s.category == "") scriptSettingsCatSelector.setCurrentIndex(0);
-            else scriptSettingsCatSelector.setCurrentText(s.category);
+            scriptSettingsCatSelector.setItems( catItems );
+            if (s.category != "") scriptSettingsCatSelector.selectText(s.category);
 
             // Set fav
-            scriptSettingsFavButton.setChecked( s.favorite );
+            scriptSettingsFavButton.value = s.favorite;
 
             scriptSettingsEditor.show();
         }

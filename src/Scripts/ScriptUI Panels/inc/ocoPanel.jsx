@@ -33,28 +33,28 @@ function buildOCOUI( tab, standAlone )
         spacer.size = [-1,3];
         
         // A title
-        DuScriptUI.staticText( tab, "Open Cut-Out" ).alignment = ['center', 'top'];
+        tab.add('statictext', undefined, "Open Cut-Out").alignment = ['center', 'top'];
     }
 
     // Main stack
 
-    var stackGroup = DuScriptUI.group( tab, 'stacked');
-    //stackGroup.margins = 3;
+    var stackGroup = addNativeGroup( tab, 'stack');
     stackGroup.alignment = ['fill','fill'];
 
     // Main group
-    var mainGroup = DuScriptUI.group( stackGroup, 'column');
+    var mainGroup = addNativeGroup( stackGroup, 'column');
     mainGroup.alignment = ['fill','fill'];
 
     // Character name
-    var nameEdit = DuScriptUI.editText(
+    // Native fields have no place holder, so the name has a label instead.
+    var nameEdit = addNativeEditText(
         mainGroup,
         '',
-        '',
-        '',
-        i18n._("Character Name"),
-        i18n._("Choose the name of the character.")
+        undefined,
+        i18n._("Choose the name of the character."),
+        i18n._("Character Name") + ':'
     );
+    nameEdit.alignment = ['fill', 'center'];
 
     // The Library
 
@@ -330,43 +330,35 @@ function buildOCOUI( tab, standAlone )
     }
 
     // UI Popups
-    var runOptionsPopup = DuScriptUI.popUp( 'Options' );
+    var runOptionsPopup = addNativePopup( 'Options' );
     runOptionsPopup.build = function() {
 
         if (runOptionsPopup.built) return;
 
-        var boneTypeSelector = createBoneTypeSelector(runOptionsPopup.content);
+        var boneTypeSelector = addNativeBoneTypeSelector(runOptionsPopup.content);
 
-        var envelopBox = DuScriptUI.checkBox(runOptionsPopup.content, {
-            text: i18n._("Show envelops"),
-            image: w16_envelop
-        });
+        var envelopBox = addNativeCheckBox(runOptionsPopup.content, i18n._("Show envelops"), w16_envelop);
 
-        var noodleBox = DuScriptUI.checkBox(runOptionsPopup.content, {
-            text: i18n._("Show noodles"),
-            image: w16_noodle
-        });
+        var noodleBox = addNativeCheckBox(runOptionsPopup.content, i18n._("Show noodles"), w16_noodle);
 
-        var compBox = DuScriptUI.checkBox(runOptionsPopup.content, {
-            text: i18n._("Create new composition"),
-            image: w16_composition
-        });
+        var compBox = addNativeCheckBox(runOptionsPopup.content, i18n._("Create new composition"), w16_composition);
 
-        DuScriptUI.separator(runOptionsPopup.content);
+        addNativeSeparator(runOptionsPopup.content);
 
-        var applyButton = DuScriptUI.button(
+        var applyButton = addNativeButton(
             runOptionsPopup.content,
             i18n._("Create"),
             w12_check,
             i18n._("[Alt]: Create and build in a new composition.")
         );
-        applyButton.onClick = lib.runItem;
+        applyButton.onClick = function() { lib.runItem(); };
+        applyButton.onAltClick = function() { lib.runItem('alt'); };
 
         lib.onRun = function(item) {
             var doc = OCODoc.fromFile( item.data );
             if (nameEdit.text != "") doc.name = nameEdit.text;
 
-            var createComp = compBox.checked;
+            var createComp = compBox.value;
             // Create a comp if there's no comp in the project yet
             if (!DuAEProject.containsComp()) createComp = true;
 
@@ -379,8 +371,8 @@ function buildOCOUI( tab, standAlone )
             var bones = [];
             if (createComp) bones = doc.toComp( );
             else bones = doc.toComp( DuAEProject.getActiveComp() );
-            Duik.Bone.setEnvelopEnabled( envelopBox.checked, bones );
-            Duik.Bone.setNoodleEnabled( noodleBox.checked, bones );
+            Duik.Bone.setEnvelopEnabled( envelopBox.value, bones );
+            Duik.Bone.setNoodleEnabled( noodleBox.value, bones );
 
             DuAEProject.setProgressMode(false);
 
@@ -408,8 +400,8 @@ function buildOCOUI( tab, standAlone )
             DuAE.beginUndoGroup( i18n._("Create OCO Meta-rig") );
 
             var layers = doc.toComp();
-            Duik.Bone.setEnvelopEnabled( envelopBox.checked, layers );
-            Duik.Bone.setNoodleEnabled( noodleBox.checked, layers );
+            Duik.Bone.setEnvelopEnabled( envelopBox.value, layers );
+            Duik.Bone.setNoodleEnabled( noodleBox.value, layers );
 
             DuAEProject.setProgressMode(false);
 
@@ -427,24 +419,26 @@ function buildOCOUI( tab, standAlone )
         };       
     };
 
-    var catNameEditor = DuScriptUI.stringPrompt(
+    var catNameEditor = addNativeStringPrompt(
         i18n._("Edit category name"),
         i18n._("New Category")
     );
 
-    var ocoEditorPopup = DuScriptUI.popUp( i18n._("Animation settings.") );
+    var ocoEditorPopup = addNativePopup( i18n._("Animation settings.") );
     ocoEditorPopup.content.alignment = ['fill','top'];
     ocoEditorPopup.editing = null;
 
     // For now, can't move between categories. Just move them from their folders
-    var ocoEditorCatSelector = DuScriptUI.selector(ocoEditorPopup.content);
+    var ocoEditorCatSelector = addNativeValueSelector(ocoEditorPopup.content, []);
     ocoEditorCatSelector.onChange = function () {
+        // Only when a category is picked, not when the list is filled.
+        if (ocoEditorCatSelector.freeze) return;
         if (!ocoEditorPopup.editing) return;
 
         // Keep prev path to update lib metadata
         var oldURI = ocoEditorPopup.editing.absoluteURI;
 
-        var newFolder = ocoEditorCatSelector.currentData;
+        var newFolder = ocoEditorCatSelector.getValue();
 
         if (!newFolder) return;
         // Move file and thumb to the new folder
@@ -461,7 +455,7 @@ function buildOCOUI( tab, standAlone )
         lib.refresh();
     };
 
-    var ocoEditorFavButton = DuScriptUI.checkBox(
+    var ocoEditorFavButton = addNativeCheckBox(
         ocoEditorPopup.content,
         i18n._("Favorite"),
         w12_fav
@@ -470,7 +464,7 @@ function buildOCOUI( tab, standAlone )
         if (!ocoEditorPopup.editing) return;
 
         var a = getCreateLibEntry( ocoEditorPopup.editing );
-        a.favorite = ocoEditorFavButton.checked;
+        a.favorite = ocoEditorFavButton.value;
         updateLibEntry(a);
 
         ocoEditorPopup.hide();
@@ -478,22 +472,21 @@ function buildOCOUI( tab, standAlone )
         lib.refresh();
     };
 
-    ocoEditorNameEdit = DuScriptUI.editText(
+    // Native fields have no place holder, so the name has a label instead.
+    var ocoEditorNameEdit = addNativeEditText(
         ocoEditorPopup.content,
         '',
+        undefined,
         '',
-        '',
-        i18n._("Meta-Rig name")
+        i18n._("Meta-Rig name") + ':'
     );
+    ocoEditorNameEdit.characters = 16;
 
-    var ocoEditorOKButton = DuScriptUI.button(
+    var ocoEditorOKButton = addNativeButton(
         ocoEditorPopup.content,
         i18n._("OK"),
         DuScriptUI.Icon.CHECK,
-        i18n._("Meta-Rig settings."),
-        false,
-        'row',
-        'center'
+        i18n._("Meta-Rig settings.")
     );
     ocoEditorOKButton.onClick = ocoEditorNameEdit.onChange = function() {
         if (!ocoEditorPopup.editing) return;
@@ -540,7 +533,7 @@ function buildOCOUI( tab, standAlone )
     libOptions.removeItemHelpTip = i18n._("Remove the selected Meta-Rig or category from library.");
     libOptions.refreshButton = true;
 
-    var lib = DuScriptUI.library(
+    var lib = addNativeLibrary(
         mainGroup, // container
         ocoLib, // library
         libOptions
@@ -597,19 +590,19 @@ function buildOCOUI( tab, standAlone )
 
     lib.onAddItem = function( category ) {
         if (!exportGroup.built) {
-            createSubPanel (
+            addNativeSubPanel (
                 exportGroup,
                 i18n._("Create OCO Meta-Rig"),
                 mainGroup,
                 false
             );
 
-            var layerSelector = DuScriptUI.selector( exportGroup );
-            layerSelector.addButton({ text: i18n._("Selected bones"), image: w16_selected_layers});
-            layerSelector.addButton({ text: i18n._("All bones"), image: w16_layers});
-            layerSelector.setCurrentIndex(1);
+            var layerSelector = addNativeDropdown( exportGroup, [
+                [i18n._("Selected bones"), w16_selected_layers],
+                [i18n._("All bones"), w16_layers]
+            ], 1);
 
-            var iconSelector = DuScriptUI.fileSelector(
+            var iconSelector = addNativeFileSelector(
                 exportGroup,
                 i18n._("Icon") + ' ',
                 true,
@@ -620,30 +613,29 @@ function buildOCOUI( tab, standAlone )
                 'row'
             );
 
-            var ocoNameEdit = DuScriptUI.editText(
+            // Native fields have no place holder, so the name has a label instead.
+            var ocoNameEdit = addNativeEditText(
                 exportGroup,
                 '',
-                '',
-                '',
-                i18n._("Meta-Rig Name"),
-                i18n._("Choose the name of the meta-rig.")
+                undefined,
+                i18n._("Choose the name of the meta-rig."),
+                i18n._("Meta-Rig Name") + ':'
             );
 
-            var heightEdit = DuScriptUI.editText(
+            var heightEdit = addNativeEditText(
                 exportGroup,
                 '185',
-                i18n._("Character height:") + " ",
-                ' ' + i18n._("cm")
+                i18n._("cm"),
+                '',
+                i18n._("Character height:")
             );
 
-            var applyGroup = DuScriptUI.group( exportGroup, 'row' );
             // Valid button
-            var applyExportButton = DuScriptUI.button( applyGroup, {
-                text: i18n._("Create OCO Meta-Rig"),
-                image: DuScriptUI.Icon.CHECK,
-                helpTip: i18n._("Export the selected armature to an OCO Meta-Rig file."),
-                alignment: 'center'
-            });
+            var applyExportButton = addNativeValidButton(
+                exportGroup,
+                i18n._("Create OCO Meta-Rig"),
+                i18n._("Export the selected armature to an OCO Meta-Rig file.")
+            );
 
             applyExportButton.onClick = function ()
             {
@@ -657,7 +649,7 @@ function buildOCOUI( tab, standAlone )
                 if (h == 0) h = 185;
                 if (isNaN(h)) h = 185;
 
-                var bones = Duik.Bone.get(layerSelector.currentIndex == 0);
+                var bones = Duik.Bone.get(layerSelector.selection.index == 0);
 
                 var doc = OCODoc.fromComp(
                     undefined,
@@ -695,7 +687,7 @@ function buildOCOUI( tab, standAlone )
                 mainGroup.visible = true;
             };
 
-            DuScriptUI.layout(exportGroup);
+            nativeLayout(exportGroup);
         }
 
         if (!(category.data instanceof Folder) && category.data != 'rootCat') {
@@ -750,7 +742,7 @@ function buildOCOUI( tab, standAlone )
     lib.onEditItem = function(item, category) {
         if (item.libType == 'item') {
             // Set name
-            ocoEditorNameEdit.setText( item.text );
+            ocoEditorNameEdit.text = item.text;
 
             // Editing
             ocoEditorPopup.editing = item.data;
@@ -760,23 +752,16 @@ function buildOCOUI( tab, standAlone )
             var cat = DuPath.getName( item.data.parent );
             if (cat == DuPath.getName(ocoLibrary.absoluteURI())) cat = i18n._("Uncategorized");
             
-            ocoEditorCatSelector.freeze = true;
-
-            ocoEditorCatSelector.clear();
-            ocoEditorCatSelector.addButton( i18n._("Uncategorized"), w12_file);
-            
+            var catItems = [ [i18n._("Uncategorized"), w12_file] ];
             for (var i = 0; i < allCats.length; i++) {
-                var n = DuPath.getName( allCats[i] );
-                ocoEditorCatSelector.addButton( n, w12_folder, undefined, allCats[i] );
+                catItems.push( [DuPath.getName( allCats[i] ), w12_folder, allCats[i]] );
             }
-            
-            ocoEditorCatSelector.setCurrentText( cat );
-            
-            ocoEditorCatSelector.freeze = false;
+            ocoEditorCatSelector.setItems( catItems );
+            ocoEditorCatSelector.selectText( cat );
 
             // Set Fav
             var a = getCreateLibEntry( ocoEditorPopup.editing );
-            ocoEditorFavButton.setChecked( a.favorite );
+            ocoEditorFavButton.value = a.favorite;
 
             ocoEditorPopup.show();
         }
@@ -811,11 +796,14 @@ function buildOCOUI( tab, standAlone )
         }
     };
 
-    // Autorig button
-    var autorigButton = createAutorigButton(mainGroup);
-    autorigButton.alignment = ['fill', 'bottom'];
+    // Autorig button, in a grid like the Links and constraints panel: its options and image, then the button.
+    addNativeSeparator(mainGroup).alignment = ['fill', 'bottom'];
+    var autorigLine = addNativeButtonGrid(mainGroup);
+    autorigLine.alignment = ['fill', 'bottom'];
+    autorigLine.buttonHeight = 24;
+    var autorigButton = addNativeAutorigButton(autorigLine);
 
-    var exportGroup = DuScriptUI.group( stackGroup, 'column');
+    var exportGroup = addNativeGroup( stackGroup, 'column');
     exportGroup.visible = false;
     exportGroup.built = false;
 

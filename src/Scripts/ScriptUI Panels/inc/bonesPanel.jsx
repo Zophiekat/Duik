@@ -8,14 +8,22 @@ function buildBonesUI( tab, standAlone )
         spacer.margins = 0;
         spacer.spacing = 0;
         spacer.size = [-1,3];
-        
+
         // A title
-        DuScriptUI.staticText( tab, i18n._("Bones") ).alignment = ['center', 'top'];
+        tab.add('statictext', undefined, i18n._("Bones")).alignment = ['center', 'top'];
     }
 
-    // Prop buttons
+    // The panel is a row, like the Links and constraints panel: the tool bar on the left,
+    // then the buttons and the bone settings they open.
+    var contentGroup = addNativeGroup(tab, 'row');
+    contentGroup.alignment = ['fill', 'fill'];
+    contentGroup.alignChildren = ['fill', 'fill'];
+    // Room on each side of the separator, so the tool bar and the buttons don't hug it.
+    contentGroup.spacing = 8;
 
-    var toolsGroup = DuScriptUI.toolBar( tab );
+    // tools: two per row, down the left of the panel
+    var toolsGroup = addNativeToolBar(contentGroup, 2, 32, 32);
+    toolsGroup.alignment = ['left', 'top'];
 
     var selectButton = toolsGroup.addButton(
         i18n._("Select bones"),
@@ -50,7 +58,7 @@ function buildBonesUI( tab, standAlone )
         DuScriptUI.progressBar.reset();
         DuScriptUI.progressBar.show();
         Duik.Bone.autoParent(undefined, undefined, true);
-        
+
         DuScriptUI.progressBar.close();
     };
     linkArtButton.onAltClick = function() {
@@ -98,301 +106,64 @@ function buildBonesUI( tab, standAlone )
         DuScriptUI.Icon.SETTINGS,
         i18n._("Edit selected bones")
     );
-    editButton.onClick = function()
-    {
-        if (!editGroup.built) {
-            function setSide()
-            {
-                var side = getSide(sideEditSelector);
-                Duik.Bone.setSide(side);
-            }
+    editButton.onClick = function() { showBoneSettings(); };
 
-            function setLocation()
-            {
-                var location = getLocation(locationEditSelector);
-                Duik.Bone.setLocation(location);
-            }
+    // Between the tool bar and the buttons.
+    addNativeSeparator(contentGroup, 'vertical');
 
-            function setColor( allRandom )
-            {
-                var color = colorEditSelector.color;
-                if (allRandom) color = null;
-                Duik.Bone.setColor(color);
-            }
+    var mainGroup = addNativeGroup(contentGroup, 'stack');
+    mainGroup.alignment = ['fill', 'fill'];
 
-            function setSize()
-            {
-                var size = parseInt( sizeEdit.text );
-                if (isNaN(size)) return;
-                Duik.Bone.setSize(size);
-            }
-
-            function setOpacity()
-            {
-                var opacity = parseInt( opacityEdit.text );
-                if (isNaN(opacity)) return;
-                Duik.Bone.setOpacity(opacity);
-            }
-
-            function setCharacterName()
-            {
-                Duik.Bone.setCharacterName( characterEdit.text );
-            }
-
-            function setLimbName()
-            {
-                Duik.Bone.setLimbName( limbEdit.text );
-            }
-
-            function setEnvelopEnabled()
-            {
-                Duik.Bone.setEnvelopEnabled( envelopBox.checked );
-            }
-
-            function setNoodleEnabled()
-            {
-                Duik.Bone.setNoodleEnabled( noodleBox.checked );
-            }
-
-            function setEnvelopOpacity()
-            {
-                var opacity = parseInt( envelopOpacityEdit.text );
-                if (isNaN(opacity)) return;
-                Duik.Bone.setEnvelopOpacity( opacity );
-            }
-
-            function setEnvelopColor()
-            {
-                Duik.Bone.setEnvelopColor( envelopColorSelector.color );
-            }
-
-            function setEnvelopStrokeSize()
-            {
-                var size = parseInt( envelopStrokeSizeEdit.text );
-                if (isNaN(size)) return;
-                Duik.Bone.setEnvelopStrokeSize( size );
-            }
-
-            function setEnvelopStrokeColor()
-            {
-                Duik.Bone.setEnvelopStrokeColor( envelopStrokeColorSelector.color );
-            }
-
-            function setNoodleColor()
-            {
-                Duik.Bone.setNoodleColor( noodleColorSelector.color );
-            }
-
-            createSubPanel (
-                editGroup,
-                i18n._("Bone settings"),
-                mainGroup,
-                false
-            );
-
-            var boneTypeSelector = createBoneTypeSelector(editGroup);
-
-            DuScriptUI.separator( editGroup, i18n._("Current Selection") );
-
-            var sideEditGroup = addSetting(editGroup, i18n._("Side"));
-            var sideEditSelector = createSideSelector( sideEditGroup );
-
-            var locationEditGroup = addSetting(editGroup, i18n._("Location"));
-            var locationEditSelector = createLocationSelector( locationEditGroup );
-
-            var colorEditGroup = addSetting(editGroup, i18n._("Color"));
-            var colorEditSelector = DuScriptUI.colorSelector( colorEditGroup, i18n._("Set the color of the selected layers.") );
-
-            var sizeEditGroup = addSetting(editGroup, i18n._("Size"));
-            var sizeEdit = DuScriptUI.editText( sizeEditGroup, {
-                text: "100",
-                placeHolder: "100",
-                suffix: " %",
-                helpTip: i18n._("Change the size of the layer."),
-                localize: false
-            });
-
-            var opacityEditGroup = addSetting(editGroup, i18n._("Opacity"));
-            var opacityEdit = DuScriptUI.editText(  opacityEditGroup, {
-                text: "100",
-                suffix: " %",
-                placeHolder: "100",
-                helpTip: i18n._("Change the opacity of the bones."),
-                localize: false
-            });
-
-            var characterEditGroup = addSetting(editGroup, i18n._("Group name"));
-            var characterEdit = DuScriptUI.editText( characterEditGroup, {
-                text: '',
-                placeHolder: i18n._("Character / Group name"),
-                helpTip: i18n._("Choose the name of the character.")
-            });
-            characterEdit.alignment = ['fill', 'fill'];
-
-            var limbEditGroup = addSetting(editGroup, i18n._("Name"));
-            var limbEdit = DuScriptUI.editText( limbEditGroup, {
-                text: '',
-                placeHolder: i18n._("(Limb) Name"),
-                helpTip: i18n._("Change the name of the limb this layer belongs to")
-            });
-            limbEdit.alignment = ['fill', 'fill'];
-            
-            var envelopBoxGroup = addSetting(editGroup, i18n._("Envelop"));
-            var envelopBox = DuScriptUI.checkBox(envelopBoxGroup, {
-                text: i18n._("Enabled"),
-                helpTip: i18n._("Toggle the envelops of the selected bones")
-            });
-
-            var envelopOpacityGroup = addSetting(editGroup, i18n._("Envelop opacity"));
-            var envelopOpacityEdit = DuScriptUI.editText( envelopOpacityGroup, {
-                text: "50",
-                placeHolder: "50",
-                suffix: " %",
-                helpTip: i18n._("Change the opacity of the envelop."),
-                localize: false
-            });
-
-            var envelopColorGroup = addSetting(editGroup, i18n._("Envelop color"));
-            var envelopColorSelector = DuScriptUI.colorSelector( envelopColorGroup, i18n._("Set the color of the selected envelops.") );
-
-            var envelopStrokeSizeGroup = addSetting(editGroup, i18n._("Envelop stroke size"));
-            var envelopStrokeSizeEdit = DuScriptUI.editText( envelopStrokeSizeGroup, {
-                text: "4",
-                placeHolder: "4",
-                suffix: " px",
-                helpTip: i18n._("Change the size of the envelop stroke."),
-                localize: false
-            });
-
-            var envelopStrokeColorGroup = addSetting(editGroup, i18n._("Envelop stroke color"));
-            var envelopStrokeColorSelector = DuScriptUI.colorSelector( envelopStrokeColorGroup, i18n._("Set the color of the selected envelops strokes.") );
-
-            var noodleBoxGroup = addSetting(editGroup, i18n._("Noodle"));
-            var noodleBox = DuScriptUI.checkBox(noodleBoxGroup, {
-                text: i18n._("Enabled"),
-                helpTip: i18n._("Toggle the noodles of the selected bones")
-            });
-
-            var noodleColorGroup = addSetting(editGroup, i18n._("Noodle color"));
-            var noodleColorSelector = DuScriptUI.colorSelector( noodleColorGroup, i18n._("Set the color of the selected noodles.") );
-
-            DuScriptUI.separator( editGroup );
-
-            var applyGroup = DuScriptUI.group( editGroup, 'row' );
-
-            var pickButton = DuScriptUI.button( applyGroup, {
-                text: i18n._("Pick selected layer"),
-                image: DuScriptUI.Icon.EYE_DROPPER,
-                alignment: 'center'
-            });
-
-            // Valid button
-            var applyEditButton = DuScriptUI.button( applyGroup, {
-                text: i18n._("Apply"),
-                image: DuScriptUI.Icon.CHECK,
-                helpTip: i18n._("Apply changes.\n\n[Alt]: assigns a random color to each bone."),
-                alignment: 'center'
-            });
-            applyEditButton.onClick = function ()
-            {
-                DuAE.beginUndoGroup(i18n._("Edit bones"));
-                if (sideEditGroup.checked) setSide();
-                if (locationEditGroup.checked) setLocation();
-                if (colorEditGroup.checked) setColor();
-                if (sizeEditGroup.checked) setSize();
-                if (opacityEditGroup.checked) setOpacity();
-                if (characterEditGroup.checked) setCharacterName();
-                if (limbEditGroup.checked) setLimbName();
-                if (envelopBoxGroup.checked) setEnvelopEnabled();
-                if (noodleBoxGroup.checked) setNoodleEnabled();
-                if (envelopOpacityGroup.checked) setEnvelopOpacity();
-                if (envelopColorGroup.checked) setEnvelopColor();
-                if (envelopStrokeSizeGroup.checked) setEnvelopStrokeSize();
-                if (envelopStrokeColorGroup.checked) setEnvelopStrokeColor();
-                if (noodleColorGroup.checked) setNoodleColor();
-                DuAE.endUndoGroup();
-            };
-            applyEditButton.onAltClick = function()
-            {
-                DuAE.beginUndoGroup(i18n._("Edit bones"));
-                if (sideEditGroup.checked) setSide();
-                if (locationEditGroup.checked) setLocation();
-                if (colorEditGroup.checked) setColor(true);
-                if (sizeEditGroup.checked) setSize();
-                if (opacityEditGroup.checked) setOpacity();
-                if (characterEditGroup.checked) setCharacterName();
-                if (limbEditGroup.checked) setLimbName();
-                if (envelopBoxGroup.checked) setEnvelopEnabled();
-                if (noodleBoxGroup.checked) setNoodleEnabled();
-                if (envelopOpacityGroup.checked) setEnvelopOpacity();
-                if (envelopColorGroup.checked) setEnvelopColor();
-                if (envelopStrokeSizeGroup.checked) setEnvelopStrokeSize();
-                if (envelopStrokeColorGroup.checked) setEnvelopStrokeColor();
-                if (noodleColorGroup.checked) setNoodleColor();
-                DuAE.endUndoGroup();
-            }
-
-            editGroup.refresh = function ()
-            {
-                setSideSelector( sideEditSelector, Duik.Layer.side() );
-
-                setLocationSelector( locationEditSelector, Duik.Layer.location());
-
-                colorEditSelector.setColor( Duik.Bone.color( ) );
-
-                sizeEdit.setText( Duik.Bone.size() );
-
-                opacityEdit.setText( Duik.Bone.opacity() );
-
-                characterEdit.setText( Duik.Layer.groupName() );
-
-                limbEdit.setText( Duik.Layer.name() );
-
-                envelopBox.setChecked( Duik.Bone.hasEnvelop() );
-
-                envelopOpacityEdit.setText( Duik.Bone.envelopOpacity() );
-
-                envelopColorSelector.setColor( Duik.Bone.envelopColor() );
-
-                envelopStrokeSizeEdit.setText( Duik.Bone.envelopStrokeSize() );
-
-                envelopStrokeColorSelector.setColor( Duik.Bone.envelopStrokeColor() );
-
-                noodleBox.setChecked( Duik.Bone.hasNoodle() );
-
-                noodleColorSelector.setColor( Duik.Bone.noodleColor() );
-            }
-
-            pickButton.onClick = editGroup.refresh;
-
-            DuScriptUI.showUI(editGroup);
-        }
-        editGroup.refresh();
-        mainGroup.visible = false;
-        editGroup.visible = true;
-    }
-
-    // Main stack
-
-    var stackGroup = DuScriptUI.group( tab, 'stacked');
-    //stackGroup.margins = 3;
-    stackGroup.alignment = ['fill','fill'];
-
-    // Main group
-    var mainGroup = DuScriptUI.group( stackGroup, 'column');
-    mainGroup.alignment = ['fill','fill'];
+    var bonesGroup = addNativeGroup(mainGroup, 'column');
 
     // Character name
-    var nameEdit = DuScriptUI.editText(
-        mainGroup,
-        '',
-        '',
-        '',
-        i18n._("Character Name"),
-        i18n._("Choose the name of the character.")
-    );
-    
+    // Native fields have no place holder, so the name has a label instead.
+    var nameGroup = addNativeGroup(bonesGroup, 'row');
+    nameGroup.alignment = ['fill', 'top'];
+    var nameLabel = nameGroup.add('statictext', undefined, i18n._("Character Name") + ':');
+    nameLabel.helpTip = i18n._("Choose the name of the character.");
+    var nameEdit = nameGroup.add('edittext', undefined, '');
+    nameEdit.alignment = ['fill', 'center'];
+    nameEdit.helpTip = nameLabel.helpTip;
+
+    addNativeSeparator(bonesGroup);
+
     // Limbs
+
+    // A checkbox for a part of a limb, colored like the part in the illustration.
+    function addLimbCheckBox( container, text, color, checked )
+    {
+        var checkbox = addNativeCheckBox(container, text, null, '', checked);
+        nativeTextColor(checkbox, color);
+        return checkbox;
+    }
+
+    // A field for a number of layers, between its label and its unit, like "Spine: 3 layers".
+    // Duik's fields showed the default number while they were empty; these ones start with it.
+    function addLayerCountField( container, label, suffix, count, color )
+    {
+        var row = addNativeGroup(container, 'row');
+        row.alignment = ['fill', 'top'];
+
+        var labelText = row.add('statictext', undefined, label);
+        if (color) nativeTextColor(labelText, color);
+
+        var edit = row.add('edittext', undefined, '' + count);
+        edit.alignment = ['fill', 'center'];
+        edit.characters = 4;
+
+        if (suffix) row.add('statictext', undefined, suffix);
+
+        return edit;
+    }
+
+    // An illustration of the limb, at the top of its options.
+    function addIllustration( container, image )
+    {
+        var illustration = container.add('image', undefined, nativeImage(image));
+        illustration.alignment = ['center', 'top'];
+        return illustration;
+    }
 
     function createArmButton( group, type )
     {
@@ -405,7 +176,6 @@ function buildBonesUI( tab, standAlone )
             i18n._("Add an armature for an arm") + '\n\n' +
                 i18n._("[Ctrl]: Auto-parent the selection to the new bones.\n[Alt]: Assign a random color to the new limb."),
             true, // Options
-            false, // localize
             undefined, // optionsWithoutButton
             i18n._("Create") // optionsButtonText
         );
@@ -429,18 +199,18 @@ function buildBonesUI( tab, standAlone )
                 else if (type == 'ungulate') t = OCO.LimbType.UNGULATE;
                 else if (type == 'arthropod') t = OCO.LimbType.ARTHROPOD;
 
-                var side = getSide(armSideSelector);
-                var location = getLocation(armLocationSelector);
+                var side = armSideSelector.getValue();
+                var location = armLocationSelector.getValue();
 
                 var bones = Duik.Bone.arm(
                     characterName,
                     t,
                     side,
-                    armShoulderButton.checked,
-                    armArmButton.checked,
-                    armForearmButton.checked,
-                    armHandButton.checked,
-                    armClawsButton.checked,
+                    armShoulderButton.value,
+                    armArmButton.value,
+                    armForearmButton.value,
+                    armHandButton.value,
+                    armClawsButton ? armClawsButton.value : false,
                     location,
                     forceLink
                 );
@@ -451,77 +221,37 @@ function buildBonesUI( tab, standAlone )
                 };
 
                 // Set the side to the other for the next limb
-                if (side == OCO.Side.LEFT) armSideSelector.setCurrentIndex( 2 );
-                else if (side == OCO.Side.RIGHT) armSideSelector.setCurrentIndex( 1 );
+                if (side == OCO.Side.LEFT) armSideSelector.setValue( OCO.Side.RIGHT );
+                else if (side == OCO.Side.RIGHT) armSideSelector.setValue( OCO.Side.LEFT );
 
                 DuScriptUI.progressBar.close();
 
                 DuAE.endUndoGroup();
             };
-            
-            var illustration;
-            if (type == 'hominoid')
-            {
-                illustration = armButton.optionsPanel.add('image', undefined, w128_human_arm.binAsString );
+
+            var optionsPanel = armButton.optionsPanel;
+
+            if (type == 'hominoid') addIllustration( optionsPanel, w128_human_arm );
+            else if (type == 'plantigrade') addIllustration( optionsPanel, w128_bear_arm );
+            else if (type == 'digitigrade') addIllustration( optionsPanel, w128_digitigrade_arm );
+            else if (type == 'ungulate') addIllustration( optionsPanel, w128_ungulate_arm );
+            else if (type == 'arthropod') addIllustration( optionsPanel, w128_arthropod_arm );
+
+            var armLocationSelector = addNativeLocationSelector( optionsPanel, OCO.Location.FRONT );
+            var armSideSelector = addNativeSideSelector( optionsPanel, OCO.Side.LEFT );
+
+            var armShoulderButton = addLimbCheckBox( optionsPanel, i18n._("Shoulder"), DuColor.Color.RAINBOX_RED, false );
+            var armArmButton = addLimbCheckBox( optionsPanel, i18n._("Arm"), DuColor.Color.ORANGE, true );
+            var armForearmButton = addLimbCheckBox( optionsPanel, i18n._("Forearm"), DuColor.Color.YELLOW, true );
+            var armHandButton = addLimbCheckBox( optionsPanel, i18n._("Hand"), DuColor.Color.LIGHT_BLUE, true );
+
+            // Hominoids have no claws: there's no checkbox for them rather than a hidden one taking room.
+            var armClawsButton = null;
+            if (type != 'hominoid') {
+                var clawsName = i18n._("Claws");
+                if (type == 'ungulate') clawsName = i18n._("Hoof");
+                armClawsButton = addLimbCheckBox( optionsPanel, clawsName, DuColor.Color.LIGHT_PURPLE, false );
             }
-            else if (type == 'plantigrade')
-            {
-                illustration = armButton.optionsPanel.add('image', undefined, w128_bear_arm.binAsString );
-            }
-            else if (type == 'digitigrade')
-            {
-                illustration = armButton.optionsPanel.add('image', undefined, w128_digitigrade_arm.binAsString );
-            }
-            else if (type == 'ungulate')
-            {
-                illustration = armButton.optionsPanel.add('image', undefined, w128_ungulate_arm.binAsString );
-            }
-            else if (type == 'arthropod')
-            {
-                illustration = armButton.optionsPanel.add('image', undefined, w128_arthropod_arm.binAsString );
-            }
-            illustration.alignment = ['center', 'top'];
-
-            var armLocationSelector = createLocationSelector( armButton.optionsPanel );
-            armLocationSelector.setCurrentIndex(1);
-            var armSideSelector = createSideSelector( armButton.optionsPanel );
-            armSideSelector.setCurrentIndex(1);
-
-            var armShoulderButton = DuScriptUI.checkBox(
-                armButton.optionsPanel, 
-                i18n._("Shoulder") );
-            armShoulderButton.textColor = DuColor.Color.RAINBOX_RED;
-            armShoulderButton.dim();
-
-            var armArmButton = DuScriptUI.checkBox(
-                armButton.optionsPanel, 
-                i18n._("Arm") );
-            armArmButton.textColor = DuColor.Color.ORANGE;
-            armArmButton.setChecked(true);
-            armArmButton.dim();
-
-            var armForearmButton = DuScriptUI.checkBox(
-                armButton.optionsPanel, 
-                i18n._("Forearm") );
-            armForearmButton.textColor = DuColor.Color.YELLOW;
-            armForearmButton.setChecked(true);
-            armForearmButton.dim();
-
-            var armHandButton = DuScriptUI.checkBox(
-                armButton.optionsPanel, 
-                i18n._("Hand") );
-            armHandButton.textColor = DuColor.Color.LIGHT_BLUE;
-            armHandButton.setChecked(true);
-            armHandButton.dim();
-
-            var clawsName = i18n._("Claws");
-            if (type == 'ungulate') clawsName = i18n._("Hoof");
-            var armClawsButton = DuScriptUI.checkBox(
-                armButton.optionsPanel, 
-                clawsName );
-            armClawsButton.textColor = DuColor.Color.LIGHT_PURPLE;
-            armClawsButton.dim();
-            if (type == 'hominoid') armClawsButton.visible = false;
 
             armButton.onClick = createArm;
             armButton.onAltClick = function() { createArm(false, true); };
@@ -538,7 +268,6 @@ function buildBonesUI( tab, standAlone )
             i18n._("Add an armature for a leg") + '\n\n' +
                 i18n._("[Ctrl]: Auto-parent the selection to the new bones.\n[Alt]: Assign a random color to the new limb."),
             true, // Options
-            undefined, // localize
             undefined, // optionsWithoutButton
             i18n._("Create") // optionsButtonText
         );
@@ -560,17 +289,17 @@ function buildBonesUI( tab, standAlone )
                 if (type == 'plantigrade') t = OCO.LimbType.PLANTIGRADE;
                 if (type == 'digitigrade') t = OCO.LimbType.DIGITIGRADE;
                 else if (type == 'ungulate') t = OCO.LimbType.UNGULATE;
-                var side = getSide(legSideSelector);
-                var location = getLocation(legLocationSelector);
+                var side = legSideSelector.getValue();
+                var location = legLocationSelector.getValue();
 
                 var bones = Duik.Bone.leg(
                     characterName,
                     t,
                     side,
-                    legThighButton.checked,
-                    legCalfButton.checked,
-                    legFootButton.checked,
-                    legClawsButton.checked,
+                    legThighButton.value,
+                    legCalfButton.value,
+                    legFootButton.value,
+                    legClawsButton.value,
                     location,
                     forceLink
                 );
@@ -581,73 +310,38 @@ function buildBonesUI( tab, standAlone )
                 };
 
                 // Set the side to the other for the next limb
-                if (side == OCO.Side.LEFT) legSideSelector.setCurrentIndex( 2 );
-                else if (side == OCO.Side.RIGHT) legSideSelector.setCurrentIndex( 1 );
+                if (side == OCO.Side.LEFT) legSideSelector.setValue( OCO.Side.RIGHT );
+                else if (side == OCO.Side.RIGHT) legSideSelector.setValue( OCO.Side.LEFT );
 
                 DuScriptUI.progressBar.close();
 
                 DuAE.endUndoGroup();
             };
 
-            var illustration;
-            if (type == 'hominoid')
-            {
-                illustration = legButton.optionsPanel.add('image', undefined, w128_human_leg.binAsString );
-            }
-            else if (type == 'plantigrade')
-            {
-                illustration = legButton.optionsPanel.add('image', undefined, w128_human_leg.binAsString );
-            }
-            else if (type == 'digitigrade')
-            {
-                illustration = legButton.optionsPanel.add('image', undefined, w128_digitigrade_leg.binAsString );
-            }
-            else if (type == 'ungulate')
-            {
-                illustration = legButton.optionsPanel.add('image', undefined, w128_ungulate_leg.binAsString );
-            }
-            illustration.alignment = ['center', 'top'];
+            var optionsPanel = legButton.optionsPanel;
 
-            var legLocationSelector = createLocationSelector( legButton.optionsPanel );
-            legLocationSelector.setCurrentIndex(2);
-            var legSideSelector = createSideSelector( legButton.optionsPanel );
-            legSideSelector.setCurrentIndex(1);
+            if (type == 'hominoid') addIllustration( optionsPanel, w128_human_leg );
+            else if (type == 'plantigrade') addIllustration( optionsPanel, w128_human_leg );
+            else if (type == 'digitigrade') addIllustration( optionsPanel, w128_digitigrade_leg );
+            else if (type == 'ungulate') addIllustration( optionsPanel, w128_ungulate_leg );
 
-            var legThighButton = DuScriptUI.checkBox(
-                legButton.optionsPanel, 
-                i18n._("Thigh") );
-            legThighButton.textColor = DuColor.Color.ORANGE;
-            legThighButton.setChecked(true);
-            legThighButton.dim();
+            var legLocationSelector = addNativeLocationSelector( optionsPanel, OCO.Location.BACK );
+            var legSideSelector = addNativeSideSelector( optionsPanel, OCO.Side.LEFT );
 
-            var legCalfButton = DuScriptUI.checkBox(
-                legButton.optionsPanel, 
-                i18n._("Calf") );
-            legCalfButton.textColor = DuColor.Color.YELLOW;
-            legCalfButton.setChecked(true);
-            legCalfButton.dim();
-
-            var legFootButton = DuScriptUI.checkBox(
-                legButton.optionsPanel, 
-                i18n._("Foot") );
-            legFootButton.textColor = DuColor.Color.LIGHT_BLUE;
-            legFootButton.setChecked(true);
-            legFootButton.dim();
+            var legThighButton = addLimbCheckBox( optionsPanel, i18n._("Thigh"), DuColor.Color.ORANGE, true );
+            var legCalfButton = addLimbCheckBox( optionsPanel, i18n._("Calf"), DuColor.Color.YELLOW, true );
+            var legFootButton = addLimbCheckBox( optionsPanel, i18n._("Foot"), DuColor.Color.LIGHT_BLUE, true );
 
             var clawsName = i18n._("Claws");
             if (type == 'hominoid') clawsName = i18n._("Toes");
             else if (type == 'ungulate') clawsName = i18n._("Hoof");
-            var legClawsButton = DuScriptUI.checkBox(
-                legButton.optionsPanel, 
-                clawsName );
-            legClawsButton.textColor = DuColor.Color.LIGHT_PURPLE;
-            legClawsButton.dim();
+            var legClawsButton = addLimbCheckBox( optionsPanel, clawsName, DuColor.Color.LIGHT_PURPLE, false );
 
             legButton.onClick = createLeg;
             legButton.onAltClick = function() { createLeg(false, true); };
             legButton.onCtrlClick = function() { createLeg(true, false); };
             legButton.onCtrlAltClick = function() { createLeg(true, true); };
-        }   
+        }
     }
 
     function createSpineButton( group, numNeck, numSpine, hips )
@@ -662,7 +356,6 @@ function buildBonesUI( tab, standAlone )
             i18n._("Add an armature for a spine (including the hips and head)") + '\n\n' +
                 i18n._("[Ctrl]: Auto-parent the selection to the new bones.\n[Alt]: Assign a random color to the new limb."),
             true, // Options
-            undefined, // localize
             undefined, // optionsWithoutButton
             i18n._("Create") // optionsButtonText
         );
@@ -688,10 +381,10 @@ function buildBonesUI( tab, standAlone )
 
                 var bones = Duik.Bone.spine(
                     characterName,
-                    spineHeadButton.checked,
+                    spineHeadButton.value,
                     neck,
                     spine,
-                    spineHipsButton.checked, 
+                    spineHipsButton.value,
                     forceLink
                 );
 
@@ -705,46 +398,29 @@ function buildBonesUI( tab, standAlone )
                 DuAE.endUndoGroup();
             }
 
-            var spineIllu = spineButton.optionsPanel.add('image', undefined, w128_human_spine.binAsString);
-            spineIllu.alignment = ['center', 'top'];
+            var optionsPanel = spineButton.optionsPanel;
 
-            var spineHeadButton = DuScriptUI.checkBox(
-                spineButton.optionsPanel, 
-                i18n._("Head") );
-            spineHeadButton.textColor = DuColor.Color.LIGHT_BLUE;
-            spineHeadButton.setChecked(true);
-            spineHeadButton.dim();
+            addIllustration( optionsPanel, w128_human_spine );
 
-            var spineNeckEdit = DuScriptUI.editText(
-                spineButton.optionsPanel,
-                '',
-                i18n._("Neck") + ': ',
-                ' ' + i18n._("Layers").toLowerCase(),
-                "00" + numNeck,
-                '',
-                false
+            var spineHeadButton = addLimbCheckBox( optionsPanel, i18n._("Head"), DuColor.Color.LIGHT_BLUE, true );
+
+            var spineNeckEdit = addLayerCountField(
+                optionsPanel,
+                i18n._("Neck") + ':',
+                i18n._("Layers").toLowerCase(),
+                numNeck,
+                DuColor.Color.YELLOW
             );
-            spineNeckEdit.textColor = DuColor.Color.YELLOW;
-            spineNeckEdit.changed();
 
-            var spineNumEdit = DuScriptUI.editText(
-                spineButton.optionsPanel,
-                '',
-                i18n._("Spine") + ': ',
-                ' ' + i18n._("Layers").toLowerCase(),
-                "00" + numSpine,
-                '',
-                false
+            var spineNumEdit = addLayerCountField(
+                optionsPanel,
+                i18n._("Spine") + ':',
+                i18n._("Layers").toLowerCase(),
+                numSpine,
+                DuColor.Color.ORANGE
             );
-            spineNumEdit.textColor = DuColor.Color.ORANGE;
-            spineNumEdit.changed();
 
-            var spineHipsButton = DuScriptUI.checkBox(
-                spineButton.optionsPanel, 
-                i18n._("Hips") );
-            spineHipsButton.textColor = DuColor.Color.RAINBOX_RED;
-            spineHipsButton.setChecked(hips);
-            spineHipsButton.dim();
+            var spineHipsButton = addLimbCheckBox( optionsPanel, i18n._("Hips"), DuColor.Color.RAINBOX_RED, hips );
 
             spineButton.onClick = createSpine;
             spineButton.onAltClick = function() { createSpine(false, true); };
@@ -755,14 +431,12 @@ function buildBonesUI( tab, standAlone )
 
     function createHairButton( group )
     {
-        
         var hairButton = group.addButton(
             i18n._("Hair"),
             w16_hair_strand,
             i18n._("Add an armature for a hair strand.") + '\n\n' +
                 i18n._("[Ctrl]: Auto-parent the selection to the new bones.\n[Alt]: Assign a random color to the new limb."),
             true, // Options
-            undefined, // localize
             undefined, // optionsWithoutButton
             i18n._("Create") // optionsButtonText
         );
@@ -798,17 +472,14 @@ function buildBonesUI( tab, standAlone )
                 DuScriptUI.progressBar.close();
 
                 DuAE.endUndoGroup();
-                
+
             }
 
-            var hairEdit = DuScriptUI.editText(
+            var hairEdit = addLayerCountField(
                 hairButton.optionsPanel,
-                '',
-                i18n._("Hair:") + ' ',
-                ' ' + i18n._("layers"),
-                "003",
-                '',
-                false
+                i18n._("Hair:"),
+                i18n._("layers"),
+                3
             );
 
             hairButton.onClick = createHair;
@@ -825,7 +496,6 @@ function buildBonesUI( tab, standAlone )
             w16_tail,
             "Add an armature for a tail.",
             true, // Options
-            undefined, // localize
             undefined, // optionsWithoutButton
             i18n._("Create") // optionsButtonText
         );
@@ -863,17 +533,13 @@ function buildBonesUI( tab, standAlone )
                 DuAE.endUndoGroup();
             }
 
-            var tailIllu = tailButton.optionsPanel.add('image', undefined, w128_tail.binAsString);
-            tailIllu.alignment = ['center', 'top'];
+            addIllustration( tailButton.optionsPanel, w128_tail );
 
-            var tailEdit = DuScriptUI.editText(
+            var tailEdit = addLayerCountField(
                 tailButton.optionsPanel,
-                '',
-                i18n._("Tail:") + ' ',
-                ' ' + i18n._("layers"),
-                "003",
-                '',
-                false
+                i18n._("Tail:"),
+                i18n._("layers"),
+                3
             );
 
             tailButton.onClick = createTail;
@@ -890,7 +556,6 @@ function buildBonesUI( tab, standAlone )
             w16_wing,
             i18n._("Add an armature for a wing."),
             true, // Options
-            undefined, // localize
             undefined, // optionsWithoutButton
             i18n._("Create") // optionsButtonText
         );
@@ -909,7 +574,7 @@ function buildBonesUI( tab, standAlone )
                 // Get options
                 var characterName = nameEdit.text;
 
-                var side = getSide( wingSideSelector );
+                var side = wingSideSelector.getValue();
 
                 var num = parseInt(wingFeathersEdit.text);
                 if (isNaN(num)) num = 5;
@@ -917,9 +582,9 @@ function buildBonesUI( tab, standAlone )
                 var bones = Duik.Bone.wing(
                     characterName,
                     side,
-                    wingArmButton.checked,
-                    wingForearmButton.checked,
-                    wingHandButton.checked,
+                    wingArmButton.value,
+                    wingForearmButton.value,
+                    wingHandButton.value,
                     num,
                     forceLink
                 );
@@ -930,52 +595,31 @@ function buildBonesUI( tab, standAlone )
                 };
 
                 // Set the side to the other for the next limb
-                if (side == OCO.Side.LEFT) wingSideSelector.setCurrentIndex( 2 );
-                else if (side == OCO.Side.RIGHT) wingSideSelector.setCurrentIndex( 1 );
+                if (side == OCO.Side.LEFT) wingSideSelector.setValue( OCO.Side.RIGHT );
+                else if (side == OCO.Side.RIGHT) wingSideSelector.setValue( OCO.Side.LEFT );
 
                 DuScriptUI.progressBar.close();
 
                 DuAE.endUndoGroup();
             };
 
-            var wingIllu = wingButton.optionsPanel.add('image', undefined, w128_wing.binAsString);
-            wingIllu.alignment = ['center', 'top'];
+            var optionsPanel = wingButton.optionsPanel;
 
-            var wingSideSelector = createSideSelector( wingButton.optionsPanel );
-            wingSideSelector.setCurrentIndex(1);
+            addIllustration( optionsPanel, w128_wing );
 
-            var wingArmButton = DuScriptUI.checkBox(
-                wingButton.optionsPanel, 
-                i18n._("Arm") );
-            wingArmButton.textColor = DuColor.Color.ORANGE;
-            wingArmButton.setChecked(true);
-            wingArmButton.dim();
+            var wingSideSelector = addNativeSideSelector( optionsPanel, OCO.Side.LEFT );
 
-            var wingForearmButton = DuScriptUI.checkBox(
-                wingButton.optionsPanel, 
-                i18n._("Forearm") );
-            wingForearmButton.textColor = DuColor.Color.YELLOW;
-            wingForearmButton.setChecked(true);
-            wingForearmButton.dim();
+            var wingArmButton = addLimbCheckBox( optionsPanel, i18n._("Arm"), DuColor.Color.ORANGE, true );
+            var wingForearmButton = addLimbCheckBox( optionsPanel, i18n._("Forearm"), DuColor.Color.YELLOW, true );
+            var wingHandButton = addLimbCheckBox( optionsPanel, i18n._("Hand"), DuColor.Color.LIGHT_BLUE, true );
 
-            var wingHandButton = DuScriptUI.checkBox(
-                wingButton.optionsPanel, 
-                i18n._("Hand") );
-            wingHandButton.textColor = DuColor.Color.LIGHT_BLUE;
-            wingHandButton.setChecked(true);
-            wingHandButton.dim();
-
-            var wingFeathersEdit = DuScriptUI.editText(
-            wingButton.optionsPanel,
-            '',
-            i18n._("Feathers:") + ' ',
-            ' ' + i18n._("layers"),
-            "005",
-            '',
-            false
+            var wingFeathersEdit = addLayerCountField(
+                optionsPanel,
+                i18n._("Feathers:"),
+                i18n._("layers"),
+                5,
+                DuColor.Color.LIGHT_PURPLE
             );
-            wingFeathersEdit.textColor = DuColor.Color.LIGHT_PURPLE;
-            wingFeathersEdit.changed();
 
             wingButton.onClick = createWing;
             wingButton.onAltClick = function() { createWing(false, true); };
@@ -991,7 +635,6 @@ function buildBonesUI( tab, standAlone )
             w16_fish_spine,
             i18n._("Add an armature for the spine of a fish."),
             true, // Options
-            undefined, // localize
             undefined, // optionsWithoutButton
             i18n._("Create") // optionsButtonText
         );
@@ -1015,7 +658,7 @@ function buildBonesUI( tab, standAlone )
 
                 var bones =Duik.Bone.fishSpine(
                     characterName,
-                    fishHeadButton.checked,
+                    fishHeadButton.value,
                     num,
                     forceLink
                 );
@@ -1030,22 +673,13 @@ function buildBonesUI( tab, standAlone )
                 DuAE.endUndoGroup();
             };
 
-            var fishHeadButton = DuScriptUI.checkBox(
-                fishSpineButton.optionsPanel, 
-                i18n._("Head")
-            );
-            fishHeadButton.textColor = DuColor.Color.LIGHT_BLUE;
-            fishHeadButton.setChecked(true);
-            fishHeadButton.dim();
-            
-            var fishEdit = DuScriptUI.editText(
+            var fishHeadButton = addLimbCheckBox( fishSpineButton.optionsPanel, i18n._("Head"), DuColor.Color.LIGHT_BLUE, true );
+
+            var fishEdit = addLayerCountField(
                 fishSpineButton.optionsPanel,
-                '',
-                i18n._("Spine:") + ' ',
-                ' ' + i18n._("layers"),
-                "003",
-                '',
-                false
+                i18n._("Spine:"),
+                i18n._("layers"),
+                3
             );
 
             fishSpineButton.onClick = createFishSpine;
@@ -1062,7 +696,6 @@ function buildBonesUI( tab, standAlone )
             w16_fin,
             i18n._("Add an armature for a fin."),
             true, // Options
-            undefined, // localize
             undefined, // optionsWithoutButton
             i18n._("Create") // optionsButtonText
         );
@@ -1101,35 +734,33 @@ function buildBonesUI( tab, standAlone )
                 DuAE.endUndoGroup();
             };
 
-            var finIllu = finButton.optionsPanel.add('image', undefined, w128_fin.binAsString);
-            finIllu.alignment = ['center', 'top'];
+            addIllustration( finButton.optionsPanel, w128_fin );
 
-            var finEdit = DuScriptUI.editText(
+            var finEdit = addLayerCountField(
                 finButton.optionsPanel,
-                '',
-                i18n._("Fishbones:") + ' ',
-                ' ' + i18n._("layers"),
-                "005",
-                '',
-                false
+                i18n._("Fishbones:"),
+                i18n._("layers"),
+                5
             );
 
             finButton.onClick = createFin;
             finButton.onAltClick = function() { createFin(false, true); };
             finButton.onCtrlClick = function() { createFin(true, false); };
             finButton.onCtrlAltClick = function() { createFin(true, true); };
-        }       
+        }
     }
 
-    var line1 = DuScriptUI.group( mainGroup , 'column');
+    // A grid with a row per button, like the Links and constraints panel: its options and image, then the button.
+    var line1 = addNativeButtonGrid(bonesGroup);
+    line1.buttonHeight = 24;
 
-    var hominoidGroup = DuScriptUI.multiButton(
+    var hominoidGroup = addNativeMenuButton(
         line1,
         i18n._("Hominoid"),
         w16_hominoid,
         i18n._("Create limbs for an hominoid (Humans and apes).")
     );
-    hominoidGroup.build = function() 
+    hominoidGroup.build = function()
     {
         createArmButton( this, 'hominoid' );
         createLegButton( this, 'hominoid' );
@@ -1137,13 +768,13 @@ function buildBonesUI( tab, standAlone )
         createHairButton( this );
     }
 
-    var plantigradeGroup = DuScriptUI.multiButton(
+    var plantigradeGroup = addNativeMenuButton(
         line1,
         i18n._("Plantigrade"),
         w16_bunny,
         i18n._("Create limbs for a plantigrade (primates, bears, rabbits...).")
     );
-    plantigradeGroup.build = function() 
+    plantigradeGroup.build = function()
     {
         createArmButton( this, 'plantigrade' );
         createLegButton( this, 'plantigrade' );
@@ -1152,13 +783,13 @@ function buildBonesUI( tab, standAlone )
         createHairButton( this );
     }
 
-    var digitigradeGroup = DuScriptUI.multiButton(
+    var digitigradeGroup = addNativeMenuButton(
         line1,
         i18n._("Digitigrade"),
         w16_cat,
         i18n._("Create limbs for a digitigrade (dogs, cats, dinosaurs...).")
     );
-    digitigradeGroup.build = function() 
+    digitigradeGroup.build = function()
     {
         createArmButton( this, 'digitigrade' );
         createLegButton( this, 'digitigrade' );
@@ -1167,13 +798,13 @@ function buildBonesUI( tab, standAlone )
         createHairButton( this );
     }
 
-    var ungulateGroup = DuScriptUI.multiButton(
+    var ungulateGroup = addNativeMenuButton(
         line1,
         i18n._("Ungulate"),
         w16_horse,
         i18n._("Create limbs for an ungulate (horses, cattle, giraffes, pigs, deers, camels, hippopotamuses...).")
     );
-    ungulateGroup.build = function() 
+    ungulateGroup.build = function()
     {
         createArmButton( this, 'ungulate' );
         createLegButton( this, 'ungulate' );
@@ -1182,28 +813,29 @@ function buildBonesUI( tab, standAlone )
         createHairButton( this );
     }
 
-    var arthropodGroup = DuScriptUI.multiButton(
+    var arthropodGroup = addNativeMenuButton(
         line1,
         i18n._("Arthropod"),
         w16_ant,
         i18n._("Create limbs for an arthropod (insects, spiders, scorpions, crabs, shrimps...)")
     );
-    arthropodGroup.build = function() 
+    arthropodGroup.build = function()
     {
         createArmButton( this, 'arthropod' );
         createSpineButton( this, 0, 1, false );
         createTailButton( this );
     }
 
-    var line2 = DuScriptUI.group( mainGroup , 'column');
+    // The same grid as the buttons above, so that the columns line up.
+    var line2 = line1;
 
-    var birdGroup = DuScriptUI.multiButton(
+    var birdGroup = addNativeMenuButton(
         line2,
         i18n._("Bird"),
         w16_bird,
         i18n._("Create limbs for a cute flying beast.")
     );
-    birdGroup.build = function() 
+    birdGroup.build = function()
     {
         createLegButton( this, 'digitigrade' );
         createSpineButton( this, 1, 1 );
@@ -1211,53 +843,43 @@ function buildBonesUI( tab, standAlone )
         createTailButton( this );
     }
 
-    var fishGroup = DuScriptUI.multiButton(
+    var fishGroup = addNativeMenuButton(
         line2,
         i18n._("Fish"),
         w16_fish,
         i18n._("Create limbs for weird swimming beasts.")
     );
-    fishGroup.build = function() 
+    fishGroup.build = function()
     {
         createFishSpineButton( this );
         createFinButton( this );
     }
 
     // Snake deactivated for now, still needs work
-    /*var snakeButton = DuScriptUI.button(
+    /*var snakeButton = addNativeButton(
         line2,
         i18n._("Snake"),
         w16_snake_spine,
         "Add an armature for a snake / worm with a head.",
-        true, // Options
-        undefined, // orientation
-        undefined, // alignment
-        undefined, // optionsWithoutButton
-        i18n._("Create") // optionsButtonText
+        {
+            options: true,
+            optionsButtonText: i18n._("Create")
+        }
     );
     snakeButton.optionsPopup.build = function ()
     {
-        var snakeIllu = snakeButton.optionsPanel.add('image', undefined, w128_snake_spine.binAsString);
-        snakeIllu.alignment = ['center', 'top'];
+        addIllustration( snakeButton.optionsPanel, w128_snake_spine );
 
-        var snakeHeadButton = DuScriptUI.checkBox(
-            snakeButton.optionsPanel, 
-            i18n._("Head") );
-        snakeHeadButton.textColor = DuColor.Color.LIGHT_BLUE;
-        snakeHeadButton.setChecked(true);
-        snakeHeadButton.dim();
+        var snakeHeadButton = addLimbCheckBox( snakeButton.optionsPanel, i18n._("Head"), DuColor.Color.LIGHT_BLUE, true );
 
-        snakeEdit = DuScriptUI.editText(
+        var snakeEdit = addLayerCountField(
             snakeButton.optionsPanel,
-            '',
-            i18n._("Spine") + ': ',
-            ' ' + i18n._("Layers").toLowerCase(),
-            "005",
-            '',
-            false
+            i18n._("Spine") + ':',
+            i18n._("Layers").toLowerCase(),
+            5
         );
 
-        snakeButton.onClick = function() 
+        snakeButton.onClick = function()
         {
             // Get options
             var characterName = nameEdit.text;
@@ -1267,24 +889,23 @@ function buildBonesUI( tab, standAlone )
 
             Duik.Bone.snakeSpine(
                 characterName,
-                snakeHeadButton.checked,
+                snakeHeadButton.value,
                 num
             );
         };
     }//*/
 
-    var customButton = DuScriptUI.button(
+    var customButton = addNativeButton(
         line2,
         i18n._("Custom"),
         w16_custom,
         i18n._("Add a custom armature.")+
         "\n\n"+
         i18n._("[Ctrl]: Automatically parent the selected items (layers, path vertices or puppet pins) to the new bones."),
-        true, // Options
-        undefined, // orientation
-        undefined, // alignment
-        undefined, // optionsWithoutButton
-        i18n._("Create") // optionsButtonText
+        {
+            options: true,
+            optionsButtonText: i18n._("Create")
+        }
     );
     customButton.optionsPopup.build = function ()
     {
@@ -1301,11 +922,11 @@ function buildBonesUI( tab, standAlone )
             var num = parseInt( numCustomEdit.text );
             if (isNaN(num)) num = 2;
             if (num < 1) num = 1;
-            
+
             var name = customNameEdit.text;
             var characterName = nameEdit.text;
-            var side = getSide(customSideSelector);
-            var location = getLocation(customLocationSelector);
+            var side = customSideSelector.getValue();
+            var location = customLocationSelector.getValue();
 
             var bones = Duik.Bone.customLimb(num, name, characterName, side, location, forceLink);
 
@@ -1318,29 +939,26 @@ function buildBonesUI( tab, standAlone )
 
             DuAE.endUndoGroup();
         };
-            
 
-        var customLocationSelector = createLocationSelector( customButton.optionsPanel );
-        var customSideSelector = createSideSelector( customButton.optionsPanel );
-        var numCustomGroup = DuScriptUI.group( customButton.optionsPanel );
-        DuScriptUI.staticText(
-            numCustomGroup,
-            i18n._("Number of bones:")
+        var optionsPanel = customButton.optionsPanel;
+
+        var customLocationSelector = addNativeLocationSelector( optionsPanel );
+        var customSideSelector = addNativeSideSelector( optionsPanel );
+
+        var numCustomEdit = addLayerCountField(
+            optionsPanel,
+            i18n._("Number of bones:"),
+            undefined,
+            2
         );
-        var numCustomEdit = DuScriptUI.editText(
-            numCustomGroup,
-            '',
-            '',
-            '',
-            "002"
-        );
-        var customNameEdit = DuScriptUI.editText(
-            customButton.optionsPanel,
-            '',
-            '',
-            '',
-            i18n._("Limb name")
-        );
+
+        // Native fields have no place holder, so the name has a label instead.
+        var customNameGroup = addNativeGroup( optionsPanel, 'row' );
+        customNameGroup.alignment = ['fill', 'top'];
+        customNameGroup.add('statictext', undefined, i18n._("Limb name") + ':');
+        var customNameEdit = customNameGroup.add('edittext', undefined, '');
+        customNameEdit.alignment = ['fill', 'center'];
+        customNameEdit.characters = 12;
 
         customButton.onClick = createCustom;
         customButton.onAltClick = function() { createCustom(false, true); };
@@ -1350,14 +968,294 @@ function buildBonesUI( tab, standAlone )
 
     // Auto-Rig
 
-    var sep = DuScriptUI.separator(mainGroup);
+    addNativeSeparator(bonesGroup);
 
-    createAutorigButton(mainGroup);
+    // Its own grid, after the separator, the same size as the one above.
+    var autorigLine = addNativeButtonGrid(bonesGroup);
+    autorigLine.buttonHeight = 24;
+
+    addNativeAutorigButton(autorigLine);
 
     // Edit Group
-    var editGroup = DuScriptUI.group( stackGroup, 'column');
+    var editGroup = addNativeGroup(mainGroup, 'column');
     editGroup.visible = false;
     editGroup.built = false;
 
-    
+    function showBoneSettings() {
+        if (!editGroup.built) {
+            buildNativeBoneSettingsGroup(editGroup, bonesGroup);
+        }
+
+        editGroup.refresh();
+        bonesGroup.visible = false;
+        editGroup.visible = true;
+    }
+
+    // The native version of the bone settings: the type of the bones to create,
+    // and the appearance of the selected ones, set like the controller settings.
+    function buildNativeBoneSettingsGroup( editGroup, mainGroup ) {
+        function setSide()
+        {
+            Duik.Bone.setSide(sideEditSelector.getValue());
+        }
+
+        function setLocation()
+        {
+            Duik.Bone.setLocation(locationEditSelector.getValue());
+        }
+
+        function setColor( allRandom )
+        {
+            var color = colorEditSelector.color;
+            if (allRandom) color = null;
+            Duik.Bone.setColor(color);
+        }
+
+        function setSize()
+        {
+            var size = parseInt( sizeEdit.text );
+            if (isNaN(size)) return;
+            Duik.Bone.setSize(size);
+        }
+
+        function setOpacity()
+        {
+            var opacity = parseInt( opacityEdit.text );
+            if (isNaN(opacity)) return;
+            Duik.Bone.setOpacity(opacity);
+        }
+
+        function setCharacterName()
+        {
+            Duik.Bone.setCharacterName( characterEdit.text );
+        }
+
+        function setLimbName()
+        {
+            Duik.Bone.setLimbName( limbEdit.text );
+        }
+
+        function setEnvelopEnabled()
+        {
+            Duik.Bone.setEnvelopEnabled( envelopBox.value );
+        }
+
+        function setNoodleEnabled()
+        {
+            Duik.Bone.setNoodleEnabled( noodleBox.value );
+        }
+
+        function setEnvelopOpacity()
+        {
+            var opacity = parseInt( envelopOpacityEdit.text );
+            if (isNaN(opacity)) return;
+            Duik.Bone.setEnvelopOpacity( opacity );
+        }
+
+        function setEnvelopColor()
+        {
+            Duik.Bone.setEnvelopColor( envelopColorSelector.color );
+        }
+
+        function setEnvelopStrokeSize()
+        {
+            var size = parseInt( envelopStrokeSizeEdit.text );
+            if (isNaN(size)) return;
+            Duik.Bone.setEnvelopStrokeSize( size );
+        }
+
+        function setEnvelopStrokeColor()
+        {
+            Duik.Bone.setEnvelopStrokeColor( envelopStrokeColorSelector.color );
+        }
+
+        function setNoodleColor()
+        {
+            Duik.Bone.setNoodleColor( noodleColorSelector.color );
+        }
+
+        // Applies the checked settings; allRandom assigns a random color to each bone.
+        function apply( allRandom )
+        {
+            DuAE.beginUndoGroup(i18n._("Edit bones"));
+            if (sideEditGroup.checked) setSide();
+            if (locationEditGroup.checked) setLocation();
+            if (colorEditGroup.checked) setColor(allRandom);
+            if (sizeEditGroup.checked) setSize();
+            if (opacityEditGroup.checked) setOpacity();
+            if (characterEditGroup.checked) setCharacterName();
+            if (limbEditGroup.checked) setLimbName();
+            if (envelopBoxGroup.checked) setEnvelopEnabled();
+            if (noodleBoxGroup.checked) setNoodleEnabled();
+            if (envelopOpacityGroup.checked) setEnvelopOpacity();
+            if (envelopColorGroup.checked) setEnvelopColor();
+            if (envelopStrokeSizeGroup.checked) setEnvelopStrokeSize();
+            if (envelopStrokeColorGroup.checked) setEnvelopStrokeColor();
+            if (noodleColorGroup.checked) setNoodleColor();
+            DuAE.endUndoGroup();
+        }
+
+        // Some of the colors of the envelops and noodles can't always be read, and come back as 0.
+        function showColor( selector, color )
+        {
+            if (color instanceof DuColor) selector.setColor( color );
+        }
+
+        addNativeSubPanel(
+            editGroup,
+            i18n._("Bone settings"),
+            mainGroup,
+            false
+        );
+
+        addNativeBoneTypeSelector(editGroup);
+
+        var selectionSection = addNativeSection( editGroup, i18n._("Current Selection") );
+
+        var sideEditGroup = addNativeSetting(selectionSection, i18n._("Side"));
+        var sideEditSelector = addNativeSideSelector(sideEditGroup);
+
+        var locationEditGroup = addNativeSetting(selectionSection, i18n._("Location"));
+        var locationEditSelector = addNativeLocationSelector(locationEditGroup);
+
+        addNativeSeparator(selectionSection);
+
+        var colorEditGroup = addNativeSetting(selectionSection, i18n._("Color"));
+        var colorEditSelector = addNativeColorSelector(colorEditGroup, i18n._("Set the color of the selected layers."));
+
+        var sizeEditGroup = addNativeSetting(selectionSection, i18n._("Size"));
+        var sizeEdit = addNativeEditText(
+            sizeEditGroup,
+            "100",
+            " %",
+            i18n._("Change the size of the layer.")
+        );
+
+        var opacityEditGroup = addNativeSetting(selectionSection, i18n._("Opacity"));
+        var opacityEdit = addNativeEditText(
+            opacityEditGroup,
+            "100",
+            " %",
+            i18n._("Change the opacity of the bones.")
+        );
+
+        addNativeSeparator(selectionSection);
+
+        var characterEditGroup = addNativeSetting(selectionSection, i18n._("Group name"));
+        var characterEdit = addNativeEditText(
+            characterEditGroup,
+            '',
+            undefined,
+            i18n._("Choose the name of the character.")
+        );
+
+        var limbEditGroup = addNativeSetting(selectionSection, i18n._("Name"));
+        var limbEdit = addNativeEditText(
+            limbEditGroup,
+            '',
+            undefined,
+            i18n._("Change the name of the limb this layer belongs to")
+        );
+
+        addNativeSeparator(selectionSection);
+
+        var envelopBoxGroup = addNativeSetting(selectionSection, i18n._("Envelop"));
+        var envelopBox = addNativeCheckBox(
+            envelopBoxGroup,
+            i18n._("Enabled"),
+            null,
+            i18n._("Toggle the envelops of the selected bones")
+        );
+
+        var envelopOpacityGroup = addNativeSetting(selectionSection, i18n._("Envelop opacity"));
+        var envelopOpacityEdit = addNativeEditText(
+            envelopOpacityGroup,
+            "50",
+            " %",
+            i18n._("Change the opacity of the envelop.")
+        );
+
+        var envelopColorGroup = addNativeSetting(selectionSection, i18n._("Envelop color"));
+        var envelopColorSelector = addNativeColorSelector(envelopColorGroup, i18n._("Set the color of the selected envelops."));
+
+        var envelopStrokeSizeGroup = addNativeSetting(selectionSection, i18n._("Envelop stroke size"));
+        var envelopStrokeSizeEdit = addNativeEditText(
+            envelopStrokeSizeGroup,
+            "4",
+            " px",
+            i18n._("Change the size of the envelop stroke.")
+        );
+
+        var envelopStrokeColorGroup = addNativeSetting(selectionSection, i18n._("Envelop stroke color"));
+        var envelopStrokeColorSelector = addNativeColorSelector(envelopStrokeColorGroup, i18n._("Set the color of the selected envelops strokes."));
+
+        addNativeSeparator(selectionSection);
+
+        var noodleBoxGroup = addNativeSetting(selectionSection, i18n._("Noodle"));
+        var noodleBox = addNativeCheckBox(
+            noodleBoxGroup,
+            i18n._("Enabled"),
+            null,
+            i18n._("Toggle the noodles of the selected bones")
+        );
+
+        var noodleColorGroup = addNativeSetting(selectionSection, i18n._("Noodle color"));
+        var noodleColorSelector = addNativeColorSelector(noodleColorGroup, i18n._("Set the color of the selected noodles."));
+
+        addNativeSeparator(editGroup);
+
+        var applyGroup = addNativeGroup( editGroup, 'row' );
+        applyGroup.alignment = ['fill', 'top'];
+
+        var pickButton = addNativeButton(
+            applyGroup,
+            i18n._("Pick selected layer"),
+            DuScriptUI.Icon.EYE_DROPPER
+        );
+
+        // Valid button
+        var applyEditButton = addNativeButton(
+            applyGroup,
+            i18n._("Apply"),
+            DuScriptUI.Icon.CHECK,
+            i18n._("Apply changes.\n\n[Alt]: assigns a random color to each bone.")
+        );
+        applyEditButton.onClick = function() { apply(false); };
+        applyEditButton.onAltClick = function() { apply(true); };
+
+        editGroup.refresh = function ()
+        {
+            sideEditSelector.setValue( Duik.Layer.side() );
+
+            locationEditSelector.setValue( Duik.Layer.location() );
+
+            showColor( colorEditSelector, Duik.Bone.color( ) );
+
+            sizeEdit.text = Duik.Bone.size();
+
+            opacityEdit.text = Duik.Bone.opacity();
+
+            characterEdit.text = Duik.Layer.groupName();
+
+            limbEdit.text = Duik.Layer.name();
+
+            envelopBox.value = !!Duik.Bone.hasEnvelop();
+
+            envelopOpacityEdit.text = Duik.Bone.envelopOpacity();
+
+            showColor( envelopColorSelector, Duik.Bone.envelopColor() );
+
+            envelopStrokeSizeEdit.text = Duik.Bone.envelopStrokeSize();
+
+            showColor( envelopStrokeColorSelector, Duik.Bone.envelopStrokeColor() );
+
+            noodleBox.value = !!Duik.Bone.hasNoodle();
+
+            showColor( noodleColorSelector, Duik.Bone.noodleColor() );
+        }
+
+        pickButton.onClick = editGroup.refresh;
+
+        nativeLayout(editGroup);
+    }
 }

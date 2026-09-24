@@ -140,35 +140,7 @@ function buildConstraintsUI(tab, standAlone) {
         }
     }
 
-    var alignButton = toolsGroup.addButton(
-        i18n._("Align layers"),
-        w12_h_align,
-        i18n._("Align layers.") + '\n' +
-            i18n._("All selected layers will be aligned\nto the last selected one."),
-        true
-    );
-    alignButton.optionsPopup.build = function() {
-        var posButton = addNativeCheckBox(alignButton.optionsPanel, i18n._("Position"), w16_move, '', true);
-        var rotButton = addNativeCheckBox(alignButton.optionsPanel, i18n._("Rotation"), w16_rotate, '', true);
-        var scaButton = addNativeCheckBox(alignButton.optionsPanel, i18n._("Scale"), w16_scale, '', true);
-        var opaButton = addNativeCheckBox(alignButton.optionsPanel, i18n._("Opacity"), w16_opacity);
-
-        alignButton.optionsPanel.add(
-            'statictext',
-            undefined,
-            i18n._("All selected layers will be aligned\nto the last selected one."),
-            { multiline: true }
-        );
-
-        alignButton.onClick = function() {
-            Duik.Constraint.alignLayers(
-                posButton.value,
-                rotButton.value,
-                scaButton.value,
-                opaButton.value
-            )
-        }
-    }
+    addNativeAlignButton(toolsGroup);
 
     var measureButton = toolsGroup.addButton(
         i18n._("Measure distance"),
@@ -338,7 +310,7 @@ function buildConstraintsUI(tab, standAlone) {
     var line1 = addNativeButtonGrid(constraintsGroup);
     line1.buttonHeight = 24;
 
-    addAutorigButton(line1);
+    addNativeAutorigButton(line1);
 
     var connectorButton = addNativeButton(
         line1,
@@ -1678,6 +1650,24 @@ function buildConstraintsUI(tab, standAlone) {
         );
         copyRotationConstraintButton.onClick = function() { Duik.Constraint.copyRotation(); };
 
+        var copyPointLocationConstraintButton = this.addButton(
+            i18n._("Copy Point Location"),
+            w16_blender_icon_vertexsel,
+            i18n._("Replace the location of a layer with the location of a vertex of a path, or of one of its handles.\n\n" +
+                    "A copy location constraint targeting a path: the vertex is picked by its index, " +
+                    "and the path in the constraint settings, with the target layer.")
+        );
+        copyPointLocationConstraintButton.onClick = function() { Duik.Constraint.copyPointLocation(); };
+
+        var copyPointRotationConstraintButton = this.addButton(
+            i18n._("Copy Point Rotation"),
+            w16_blender_icon_con_followpath,
+            i18n._("Turn a layer along the tangent and the normal of a path at one of its vertices, so that it follows its curvature.\n\n" +
+                    "A copy rotation constraint targeting a path: the vertex is picked by its index, " +
+                    "and the path in the constraint settings, with the target layer.")
+        );
+        copyPointRotationConstraintButton.onClick = function() { Duik.Constraint.copyPointRotation(); };
+
         var armatureConstraintButton = this.addButton(
             i18n._("Armature"),
             w16_blender_icon_con_armature,
@@ -1712,239 +1702,6 @@ function buildConstraintsUI(tab, standAlone) {
                 "The poses around the target position are blended smoothly.")
     );
     poseShapeButton.onClick = function() { showPoseShapeInterpolator(); };
-
-    // The native versions of the auto-rig button and of the move anchor points and texture map
-    // sub-panels, which other Duik panels build from utils.jsx.
-
-    function addAutorigButton( container ) {
-        var autorigButton = addNativeButton(
-            container,
-            i18n._("Auto-rig"),
-            w16_autorig,
-            i18n._("Automatically rig armatures (use the Links & constraints tab for more options)."),
-            { options: true }
-        );
-        autorigButton.optionsPopup.build = function() {
-            var optionsPanel = autorigButton.optionsPanel;
-
-            // A checkbox saving its setting.
-            function addSettingCheckBox( text, setting, defaultValue ) {
-                var checkbox = addNativeCheckBox(optionsPanel, text, null, '', DuESF.scriptSettings.get(setting, defaultValue));
-                checkbox.onClick = function() {
-                    DuESF.scriptSettings.set(setting, checkbox.value);
-                    DuESF.scriptSettings.save();
-                };
-                return checkbox;
-            }
-
-            optionsPanel.add('statictext', undefined, i18n._("3-Layer rig:"));
-            var threeLayerSelector = addNativeDropdown(optionsPanel, [
-                [
-                    i18n._("1+2-layer IK"),
-                    w16_one_two_ik,
-                    i18n._("Create a one-layer IK combined with a two-layer IK\nto handle Z-shape limbs.")
-                ],
-                [
-                    i18n._("2+1-layer IK"),
-                    w16_two_one_ik,
-                    i18n._("Create a two-layer IK combined with a one-layer IK\nto handle Z-shape limbs.")
-                ],
-                [
-                    i18n._("FK"),
-                    w16_fk,
-                    i18n._("Forward Kinematics\nwith automatic overlap and follow-through.")
-                ],
-                [
-                    i18n._("Bézier IK"),
-                    w16_bezier_ik,
-                    i18n._("Bézier Inverse Kinematics.")
-                ],
-                [
-                    i18n._("Bézier FK"),
-                    w16_bezier_fk,
-                    i18n._("Bézier FK")
-                ]
-            ], DuESF.scriptSettings.get("autorig/threeLayerMode" , 0));
-            threeLayerSelector.onChange = function() {
-                DuESF.scriptSettings.set("autorig/threeLayerMode", threeLayerSelector.selection.index);
-                DuESF.scriptSettings.save();
-            };
-
-            optionsPanel.add('statictext', undefined, i18n._("Long chain rig:"));
-            var longSelector = addNativeDropdown(optionsPanel, [
-                [
-                    i18n._("FK"),
-                    w16_fk,
-                    i18n._("Forward Kinematics\nwith automatic overlap and follow-through.")
-                ],
-                [
-                    i18n._("Bézier IK"),
-                    w16_bezier_ik,
-                    i18n._("Bézier Inverse Kinematics.")
-                ],
-                [
-                    i18n._("Bézier FK"),
-                    w16_bezier_fk,
-                    i18n._("Bézier FK")
-                ]
-            ], DuESF.scriptSettings.get("autorig/longMode" , 0));
-            longSelector.onChange = function() {
-                DuESF.scriptSettings.set("autorig/longMode", longSelector.selection.index);
-                DuESF.scriptSettings.save();
-            };
-
-            var createMasterButton = addSettingCheckBox(i18n._("Create a root controller"), "autorig/createMaster", false);
-            optionsPanel.add('statictext', undefined, i18n._("Baking:"));
-            var bakeBonesButton = addSettingCheckBox(i18n._("Bake bones"), "autorig/bakeBones", true);
-            var bakeEnvelopsButton = addSettingCheckBox(i18n._("Bake envelops"), "autorig/bakeEnvelops", true);
-            var bakeNoodlesButton = addSettingCheckBox(i18n._("Remove deactivated noodles."), "autorig/removeNoodles", true);
-
-            autorigButton.onClick = function() {
-                var threeMode = threeLayerSelector.selection.index + 1;
-                var longMode = longSelector.selection.index + 3;
-
-                if (!DuAEProject.setProgressMode(true, true, true, [autorigButton.screenX, autorigButton.screenY] )) return;
-                DuAE.beginUndoGroup( i18n._("Auto-rig") );
-
-                Duik.Rig.auto(bakeBonesButton.value, bakeEnvelopsButton.value, bakeNoodlesButton.value, longMode, threeMode, undefined, createMasterButton.value);
-
-                DuAE.endUndoGroup( i18n._("Auto-rig") );
-                DuAEProject.setProgressMode(false);
-            };
-        }
-
-        return autorigButton;
-    }
-
-    function buildNativeMoveAnchorPointGroup( moveAnchorPointGroup, mainGroup ) {
-        addNativeSubPanel(
-            moveAnchorPointGroup,
-            i18n._("Move anchor points"),
-            mainGroup,
-            false
-        );
-
-        var maskButton = addNativeCheckBox(
-            moveAnchorPointGroup,
-            i18n._("Include masks"),
-            w16_mask,
-            i18n._("Use the masks too to compute the bounds of the layers when repositionning the anchor point.")
-        );
-
-        var gridGroup = addNativeGroup(moveAnchorPointGroup, 'row');
-        gridGroup.alignment = ['center', 'top'];
-        var columns = [
-            addNativeGroup(gridGroup, 'column'),
-            addNativeGroup(gridGroup, 'column'),
-            addNativeGroup(gridGroup, 'column')
-        ];
-
-        var marginsSlider;
-
-        // Adds a button moving the anchor points to a location, in a column of the grid.
-        function addAnchorButton( column, image, location ) {
-            var button = columns[column].add('iconbutton', undefined, nativeImage(image), { style: 'button' });
-            button.onClick = function() {
-                Duik.Constraint.moveAnchorPoint(location, marginsSlider.value, maskButton.value);
-            };
-        }
-
-        addAnchorButton(0, w12_move_tl, DuMath.Location.TOP_LEFT);
-        addAnchorButton(0, w12_move_l, DuMath.Location.LEFT);
-        addAnchorButton(0, w12_move_bl, DuMath.Location.BOTTOM_LEFT);
-        addAnchorButton(1, w12_move_t, DuMath.Location.TOP);
-        addAnchorButton(1, w12_center, DuMath.Location.CENTER);
-        addAnchorButton(1, w12_move_b, DuMath.Location.BOTTOM);
-        addAnchorButton(2, w12_move_tr, DuMath.Location.TOP_RIGHT);
-        addAnchorButton(2, w12_move_r, DuMath.Location.RIGHT);
-        addAnchorButton(2, w12_move_br, DuMath.Location.BOTTOM_RIGHT);
-
-        marginsSlider = addNativeSlider(
-            moveAnchorPointGroup,
-            0,
-            -500,
-            500,
-            i18n._("Margin"),
-            DuAE.UnitText.PIXELS
-        );
-
-        moveAnchorPointGroup.built = true;
-        nativeLayout(moveAnchorPointGroup);
-    }
-
-    function buildNativeEffectorMapGroup( effectorMapGroup, mainGroup ) {
-        var titleBar = addNativeSubPanel(
-            effectorMapGroup,
-            i18n._("Pick texture"),
-            mainGroup,
-            false
-        );
-
-        var mapLabel = effectorMapGroup.add('statictext', undefined, i18n._("Select the layer (texture/map)") + ':');
-        mapLabel.enabled = false;
-
-        var layerList = addSearchList(
-            effectorMapGroup,
-            w12_layers,
-            i18n._("Pick the selected layer of the active composition."),
-            i18n._("Select the layer (texture) to use as an effector.")
-        );
-
-        // Lists the layers of the active composition, and selects the layer, or keeps the selected index.
-        effectorMapGroup.listLayers = function( layer ) {
-            var comp = DuAEProject.getActiveComp();
-            var items = [];
-            if (comp) {
-                for (var i = 1, n = comp.numLayers; i <= n; i++)
-                    items.push({ name: i + ' | ' + comp.layer(i).name, key: i });
-            }
-            layerList.setItems(items, layer ? layer.index : layerList.key);
-        };
-
-        layerList.pickButton.onClick = function() {
-            var layers = DuAEComp.getSelectedLayers();
-            if (layers.length > 0) effectorMapGroup.listLayers(layers[0]);
-        };
-
-        // Like the constraint settings, the list is filled when the panel is shown, and by the refresh button.
-        var refreshButton = titleBar.add(
-            'iconbutton',
-            undefined,
-            nativeImage(w12_blender_icon_file_refresh),
-            { style: 'button' }
-        );
-        refreshButton.helpTip = i18n._("Refresh") + "\n\n" +
-            i18n._("Update the list of layers.");
-        refreshButton.alignment = ['left', 'center'];
-        refreshButton.onClick = function() {
-            effectorMapGroup.listLayers();
-        };
-
-        var connectButton = addNativeButton(
-            effectorMapGroup,
-            i18n._("Connect properties"),
-            w16_props,
-            i18n._("Connects the selected properties to the control you've just set.")
-        );
-        connectButton.onClick = function() {
-            var comp = DuAEProject.getActiveComp();
-            if (!comp) return;
-
-            var layerIndex = layerList.key;
-            if (layerIndex < 1 || layerIndex > comp.numLayers) return;
-
-            DuAE.beginUndoGroup( i18n._("Effector map"));
-
-            var props = DuAEComp.getSelectedProps();
-
-            Duik.Automation.effectorMap( comp.layer(layerIndex), props);
-
-            DuAE.endUndoGroup();
-        }
-
-        effectorMapGroup.built = true;
-        nativeLayout(effectorMapGroup);
-    }
 
     var parentAcrossCompGroup = addNativeGroup(mainGroup, 'column');
     parentAcrossCompGroup.visible = false;

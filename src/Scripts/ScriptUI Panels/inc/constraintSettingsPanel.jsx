@@ -1,6 +1,6 @@
 /**
- * Builds the constraint settings, which show and set the target of the selected copy
- * location, copy rotation or armature constraint.<br />
+ * Builds the constraint settings, which show and set the target of the selected copy location,
+ * copy rotation, copy point location, copy point rotation or armature constraint.<br />
  * They're built in the Links and constraints panel, and in their own dockable panel,
  * <i>Duik Constraint Settings.jsx</i>. Both include <i>nativeUI.jsx</i> first, for the native controls.
  * @param {Group} container - The group to build the settings into.
@@ -10,16 +10,27 @@
  * selected constraint points at.
  */
 function buildConstraintSettingsUI(container, titleBar) {
-    // The copy location, copy rotation and armature constraints look their target up by name.
+    // The copy location, copy rotation, copy point location, copy point rotation and armature constraints
+    // look their target up by name, and the point constraints their path too.
     // The target can't live in the effect: an After Effects effect has no parameter
     // type able to hold or display a name, and effect parameters can't be renamed.
     var settingsCompList;
     var settingsLayerList;
+    var settingsPathList;
     var restPoseButton;
+
+    // The addresses of the paths listed, by their key in the list.
+    var settingsPaths = {};
 
     function settingsComp() {
         if (!settingsCompList.key) return null;
         return DuAEProject.getItemById(settingsCompList.key);
+    }
+
+    // The address of the path picked in the list, or null.
+    function settingsPath() {
+        if (!settingsPathList.key) return null;
+        return settingsPaths[settingsPathList.key];
     }
 
     function settingsTarget() {
@@ -27,27 +38,46 @@ function buildConstraintSettingsUI(container, titleBar) {
         if (!comp) return null;
         var index = settingsLayerList.key;
         if (!index || index > comp.numLayers) return null;
-        return { comp: comp, layer: comp.layer(index) };
+        return { comp: comp, layer: comp.layer(index), path: settingsPath() };
     }
 
-    // Lists the layers of a composition, and selects one of them.
-    function listLayers(comp, layer) {
+    // Lists the Bezier paths of a layer, and selects the one at the address. When there's none,
+    // selects the first path if firstPath is true, or None.
+    function listPaths(layer, address, firstPath) {
+        settingsPaths = {};
+        var items = [];
+        var paths = layer ? Duik.Constraint.listPaths(layer) : [];
+        for (var i = 0, n = paths.length; i < n; i++) {
+            var key = Duik.Constraint.pathAddressLiteral(paths[i].address);
+            settingsPaths[key] = paths[i].address;
+            items.push({ name: paths[i].name, key: key });
+        }
+
+        var key = address ? Duik.Constraint.pathAddressLiteral(address) : 0;
+        if (!settingsPaths[key]) key = firstPath && items.length > 0 ? items[0].key : 0;
+        settingsPathList.setItems(items, key);
+    }
+
+    // Lists the layers of a composition and the paths of one of them, and selects them.
+    function listLayers(comp, layer, address, firstPath) {
         var layers = [];
         if (comp) {
             for (var i = 1, n = comp.numLayers; i <= n; i++)
                 layers.push({ name: comp.layer(i).name, key: i });
         }
         settingsLayerList.setItems(layers, layer ? layer.index : 0);
+        listPaths(layer, address, firstPath);
     }
 
-    // Lists the compositions of the project and the layers of one of them, and selects the target.
-    function listTarget(comp, layer) {
+    // Lists the compositions of the project, the layers of one of them and the paths of one of
+    // these, and selects the target.
+    function listTarget(comp, layer, address, firstPath) {
         var comps = DuAEProject.getComps();
         var items = [];
         for (var i = 0, n = comps.length; i < n; i++)
             items.push({ name: comps[i].name, key: comps[i].id });
         settingsCompList.setItems(items, comp ? comp.id : 0);
-        listLayers(comp, layer);
+        listLayers(comp, layer, address, firstPath);
     }
 
     // The layer with the name in a composition, looked up like the expression of the constraint does.
@@ -58,22 +88,24 @@ function buildConstraintSettingsUI(container, titleBar) {
     }
 
     // What the selected constraint effect currently points at, like Duik.Constraint.getTarget does.
-    // The target itself is shown by the composition and layer lists.
+    // The target itself is shown by the composition, layer and path lists.
     function currentTarget() {
         var target = Duik.Constraint.getTarget();
         // Only an armature constraint with a target has a rest pose to set.
         restPoseButton.enabled = target != null && target.restPose && target.comp != '';
+        // Only the point constraints target a path. Without a constraint, a path can still be picked.
+        settingsPathList.enable(target == null || target.usesPath);
         return target;
     }
 
     // Shows what the selected constraint effect currently points at and puts its target
-    // in the lists, listing the compositions and layers again. Doesn't set the target.
+    // in the lists, listing the compositions, layers and paths again. Doesn't set the target.
     function refreshConstraintTarget() {
         var target = currentTarget();
         if (!target) {
             // Keep the target being picked.
             var current = settingsTarget();
-            listTarget(settingsComp(), current ? current.layer : null);
+            listTarget(settingsComp(), current ? current.layer : null, settingsPath(), false);
             return;
         }
 
@@ -88,14 +120,14 @@ function buildConstraintSettingsUI(container, titleBar) {
             }
         }
 
-        listTarget(comp, layerByName(comp, target.layer));
+        listTarget(comp, layerByName(comp, target.layer), target.path, false);
     }
 
     // Points the selected constraint effect at the target picked in the lists.
     function setConstraintTarget() {
         var t = settingsTarget();
         if (!t) return;
-        Duik.Constraint.setTarget(t.comp, t.layer);
+        Duik.Constraint.setTarget(t.comp, t.layer, undefined, t.path);
         currentTarget();
     }
 
@@ -110,7 +142,7 @@ function buildConstraintSettingsUI(container, titleBar) {
         { style: 'button' }
     );
     refreshButton.helpTip = i18n._("Refresh") + "\n\n" +
-        i18n._("Show what the selected copy location, copy rotation or armature constraint points at, and update the lists of compositions and layers.");
+        i18n._("Show what the selected copy location, copy rotation, copy point location, copy point rotation or armature constraint points at, and update the lists of compositions, layers and paths.");
     refreshButton.alignment = ['left', 'center'];
     refreshButton.onClick = refreshConstraintTarget;
 
@@ -122,26 +154,31 @@ function buildConstraintSettingsUI(container, titleBar) {
     setTargetSection.add('statictext', undefined, i18n._("Target Composition") + ':');
 
     settingsCompList = addSearchList(setTargetSection, w12_comp, i18n._("Pick the active composition."));
-    // Picking a composition or a layer, in the lists or with the eyedroppers, sets the target
+    // Picking a composition, a layer or a path, in the lists or with the eyedroppers, sets the target
     // right away; refreshing only fills the lists. The eyedroppers can set it only while the
     // constraint effect is still selected in the active composition.
+    // A new layer keeps the path at the same place, or else takes its first path.
     settingsCompList.onChange = function() {
         // Keep the layer with the same name in the new composition, if there's one.
         var comp = settingsComp();
-        listLayers(comp, layerByName(comp, settingsLayerList.name));
+        listLayers(comp, layerByName(comp, settingsLayerList.name), settingsPath(), true);
         setConstraintTarget();
     }
     settingsCompList.pickButton.onClick = function() {
         var comp = DuAEProject.getActiveComp();
         if (!comp) return;
-        listTarget(comp, layerByName(comp, settingsLayerList.name));
+        listTarget(comp, layerByName(comp, settingsLayerList.name), settingsPath(), true);
         setConstraintTarget();
     }
 
     setTargetSection.add('statictext', undefined, i18n._("Target Layer") + ':');
 
     settingsLayerList = addSearchList(setTargetSection, w12_layers, i18n._("Pick the selected layer of the active composition."));
-    settingsLayerList.onChange = setConstraintTarget;
+    settingsLayerList.onChange = function() {
+        var t = settingsTarget();
+        listPaths(t ? t.layer : null, settingsPath(), true);
+        setConstraintTarget();
+    }
     settingsLayerList.pickButton.onClick = function() {
         var comp = DuAEProject.getActiveComp();
         if (!comp) return;
@@ -150,7 +187,31 @@ function buildConstraintSettingsUI(container, titleBar) {
         var layers = comp.selectedLayers;
         for (var i = 0, n = layers.length; i < n; i++) {
             if (constraint && constraint.layer.index == layers[i].index) continue;
-            listTarget(comp, layers[i]);
+            listTarget(comp, layers[i], settingsPath(), true);
+            setConstraintTarget();
+            return;
+        }
+    }
+
+    setTargetSection.add('statictext', undefined, i18n._("Target Path") + ':');
+
+    settingsPathList = addSearchList(setTargetSection, w12_blender_icon_curve_bezcurve,
+        i18n._("Pick the selected path of the active composition: a shape path or a mask."),
+        i18n._("The path the copy point location and copy point rotation constraints read the vertex of.")
+    );
+    settingsPathList.onChange = setConstraintTarget;
+    settingsPathList.pickButton.onClick = function() {
+        var comp = DuAEProject.getActiveComp();
+        if (!comp) return;
+        // The selected constraint effect is selected too, and its layer can't be its own target.
+        var constraint = Duik.Constraint.getTargetConstraints()[0];
+        var props = comp.selectedProperties;
+        for (var i = 0, n = props.length; i < n; i++) {
+            var address = Duik.Constraint.pathAddress(props[i]);
+            if (!address) continue;
+            var layer = props[i].propertyGroup(props[i].propertyDepth);
+            if (constraint && constraint.layer.index == layer.index) continue;
+            listTarget(comp, layer, address, false);
             setConstraintTarget();
             return;
         }
@@ -168,7 +229,7 @@ function buildConstraintSettingsUI(container, titleBar) {
         currentTarget();
     }
 
-    listTarget(null, null);
+    listTarget(null, null, null, false);
 
     return { refresh: refreshConstraintTarget };
 }

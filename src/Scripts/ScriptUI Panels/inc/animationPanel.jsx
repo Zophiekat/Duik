@@ -1,4 +1,4 @@
-﻿function buildAnimationPanelUI(tab, standAlone) {
+function buildAnimationPanelUI(tab, standAlone) {
     standAlone = def(standAlone, false);
 
     // Utils
@@ -11,6 +11,37 @@
         sequenceGroup.visible = false;
     }
 
+    // The drop down lists of the properties and the layers to work on, which many tools share.
+    function addPropsSelector( container ) {
+        return addNativeDropdown( container, [
+            [i18n._("Animated properties"), w16_animated_prop],
+            [i18n._("Selected properties"), w16_selected_props]
+        ], 0);
+    }
+
+    function addLayersSelector( container, index ) {
+        return addNativeDropdown( container, [
+            [i18n._("Selected layers"), w16_selected_layers],
+            [i18n._("All layers"), w16_layers]
+        ], def(index, 0));
+    }
+
+    // A small icon button, and a popup of options shown when it's clicked.
+    function addOptionsButton( container, helpTip, title ) {
+        var button = addNativeButton( container, '', DuScriptUI.Icon.OPTIONS, helpTip );
+        button.alignment = ['left', 'center'];
+        button.popup = addNativePopup( title );
+        button.popup.tieTo( button );
+        return button;
+    }
+
+    // An icon button of a row.
+    function addIconButton( container, image, helpTip ) {
+        var button = addNativeButton( container, '', image, helpTip );
+        button.alignment = ['left', 'center'];
+        return button;
+    }
+
     if (!standAlone) {
         // A Spacer
         var spacer = tab.add('group');
@@ -19,11 +50,20 @@
         spacer.size = [-1, 3];
 
         // A title
-        DuScriptUI.staticText(tab, i18n._("Animation")).alignment = ['center', 'top'];
+        tab.add('statictext', undefined, i18n._("Animation")).alignment = ['center', 'top'];
     }
-    
-    // tools
-    var toolsGroup = DuScriptUI.toolBar(tab);
+
+    // The panel is a row, like the Links and constraints panel: the tool bar on the left,
+    // then the buttons and the groups they open.
+    var contentGroup = addNativeGroup(tab, 'row');
+    contentGroup.alignment = ['fill', 'fill'];
+    contentGroup.alignChildren = ['fill', 'fill'];
+    // Room on each side of the separator, so the tool bar and the buttons don't hug it.
+    contentGroup.spacing = 8;
+
+    // tools: two per row, down the left of the panel
+    var toolsGroup = addNativeToolBar(contentGroup, 2, 32, 32);
+    toolsGroup.alignment = ['left', 'top'];
 
     var selectButton = toolsGroup.addButton(
         i18n._("Select Keyframes"),
@@ -32,241 +72,152 @@
         true
     );
     selectButton.optionsPopup.build = function() {
-        var selectMethodSelector = DuScriptUI.selector(
-            selectButton.optionsPanel
-        );
+        var optionsPanel = selectButton.optionsPanel;
 
-        selectMethodSelector.addButton(
-            i18n._("Time"),
-            w16_time,
-            i18n._("Select at a precise time.")
-        );
-
-        selectMethodSelector.addButton(
-            i18n._("Range"),
-            w16_range,
-            i18n._("Select from a given range.")
-        );
-
-        selectMethodSelector.setCurrentIndex(1);
-
+        var selectMethodSelector = addNativeDropdown( optionsPanel, [
+            [
+                i18n._("Time"),
+                w16_time,
+                i18n._("Select at a precise time.")
+            ],
+            [
+                i18n._("Range"),
+                w16_range,
+                i18n._("Select from a given range.")
+            ]
+        ], 1);
         selectMethodSelector.onChange = function() {
-            outEdit.enabled = selectMethodSelector.index == 1;
+            if (!selectMethodSelector.selection) return;
+            outEdit.enabled = selectMethodSelector.selection.index == 1;
         };
 
-        var currentTimeButton = DuScriptUI.checkBox(
-            selectButton.optionsPanel,
-            i18n._("Current time")
-        );
-        currentTimeButton.setChecked(true);
-
+        var currentTimeButton = addNativeCheckBox( optionsPanel, i18n._("Current time"), null, '', true );
         currentTimeButton.onClick = function() {
-            rangeGroup.visible = !currentTimeButton.checked;
+            rangeGroup.visible = !currentTimeButton.value;
         };
 
-        var rangeGroup = DuScriptUI.group(selectButton.optionsPanel, 'row');
+        var rangeGroup = addNativeGroup(optionsPanel, 'row');
+        rangeGroup.alignment = ['fill', 'top'];
 
-        var inEdit = DuScriptUI.editText(
+        var inEdit = addNativeEditText(
             rangeGroup,
             '',
-            i18n._("time", "In") + ' ', /// TRANSLATORS: In time (incoming)
-            '',
+            undefined,
             '00:00:00:00',
-            '',
-            false
+            i18n._p("time", "In") /// TRANSLATORS: In time (incoming)
         );
-        inEdit.alignment = ['fill', 'fill'];
+        inEdit.characters = 8;
 
-        var outEdit = DuScriptUI.editText(
+        var outEdit = addNativeEditText(
             rangeGroup,
             '',
-            i18n._p("time", "Out") + ' ', /// TRANSLATORS: Out time (outgoing)
-            '',
+            undefined,
             '00:00:00:00',
-            '',
-            false
+            i18n._p("time", "Out") /// TRANSLATORS: Out time (outgoing)
         );
-        outEdit.alignment = ['fill', 'fill'];
+        outEdit.characters = 8;
 
         rangeGroup.visible = false;
 
-        var pickRangeButton = DuScriptUI.button(
-            rangeGroup,
-            '',
-            DuScriptUI.Icon.EYE_DROPPER
-        );
+        var pickRangeButton = addIconButton(rangeGroup, DuScriptUI.Icon.EYE_DROPPER, '');
         pickRangeButton.alignment = ['right', 'center'];
 
         pickRangeButton.onClick = function() {
             var comp = DuAEProject.getActiveComp();
             if (!comp) return;
 
-            if (selectMethodSelector.index == 0) {
-                inEdit.setText(timeToCurrentFormat(comp.time + comp.displayStartTime, 1 / comp.frameDuration));
+            if (selectMethodSelector.selection.index == 0) {
+                inEdit.text = timeToCurrentFormat(comp.time + comp.displayStartTime, 1 / comp.frameDuration);
             } else {
-                inEdit.setText(timeToCurrentFormat(comp.workAreaStart + comp.displayStartTime, 1 / comp.frameDuration));
-                outEdit.setText(timeToCurrentFormat(comp.workAreaStart + comp.workAreaDuration + comp.displayStartTime, 1 / comp.frameDuration));
+                inEdit.text = timeToCurrentFormat(comp.workAreaStart + comp.displayStartTime, 1 / comp.frameDuration);
+                outEdit.text = timeToCurrentFormat(comp.workAreaStart + comp.workAreaDuration + comp.displayStartTime, 1 / comp.frameDuration);
             }
         }
 
-        var layerSelectionSelector = DuScriptUI.selector(
-            selectButton.optionsPanel
-        );
+        var layerSelectionSelector = addLayersSelector( optionsPanel, 1 );
 
-        layerSelectionSelector.addButton(
-            i18n._("Selected layers"),
-            w16_selected_layers
-        );
-        layerSelectionSelector.addButton(
-            i18n._("All layers"),
-            w16_layers
-        );
+        var layerTypeSelector = addNativeDropdown( optionsPanel, [
+            [i18n._("Controllers"), w16_controller],
+            [i18n._("All layers"), w16_layers]
+        ], 0);
 
-        layerSelectionSelector.setCurrentIndex(1);
+        // The properties, as a row of checkboxes named by their image.
+        var propsGroup = addNativeGroup(optionsPanel, 'row');
+        propsGroup.alignment = ['center', 'top'];
 
-        var layerTypeSelector = DuScriptUI.selector(
-            selectButton.optionsPanel
-        );
-
-        layerTypeSelector.addButton(
-            i18n._("Controllers"),
-            w16_controller
-        );
-        layerTypeSelector.addButton(
-            i18n._("All layers"),
-            w16_layers
-        );
-
-        layerTypeSelector.setCurrentIndex(0);
-
-        var propsGroup = DuScriptUI.group(selectButton.optionsPanel, 'row');
-
-        var posButton = DuScriptUI.checkBox(
-            propsGroup,
-            '',
-            w16_move,
-            i18n._("Position")
-        );
-        posButton.alignment = ['center', 'top'];
-        posButton.setChecked(true);
-
-        var rotButton = DuScriptUI.checkBox(
-            propsGroup,
-            '',
-            w16_rotate,
-            i18n._("Rotation")
-        );
-        rotButton.alignment = ['center', 'top'];
-        rotButton.setChecked(true);
-
-        var scaButton = DuScriptUI.checkBox(
-            propsGroup,
-            '',
-            w16_scale,
-            i18n._("Scale")
-        );
-        scaButton.alignment = ['center', 'top'];
-        scaButton.setChecked(true);
-
-        var opaButton = DuScriptUI.checkBox(
-            propsGroup,
-            '',
-            w16_opacity,
-            i18n._("Opacity")
-        );
-        opaButton.alignment = ['center', 'top'];
-        opaButton.setChecked(true);
-
-        var masksButton = DuScriptUI.checkBox(
-            propsGroup,
-            '',
-            w16_mask,
-            i18n._("Masks")
-        );
-        masksButton.alignment = ['center', 'top'];
-        masksButton.setChecked(true);
-
-        var fxButton = DuScriptUI.checkBox(
-            propsGroup,
-            '',
-            w16_fx,
-            i18n._("Effects")
-        );
-        fxButton.alignment = ['center', 'top'];
-        fxButton.setChecked(true);
-
-        var allPropsButton = DuScriptUI.checkBox(
-            propsGroup,
-            '',
-            w16_props,
-            i18n._("All properties")
-        );
-        allPropsButton.alignment = ['center', 'top'];
+        var posButton = addNativeCheckBox( propsGroup, '', w16_move, i18n._("Position"), true );
+        var rotButton = addNativeCheckBox( propsGroup, '', w16_rotate, i18n._("Rotation"), true );
+        var scaButton = addNativeCheckBox( propsGroup, '', w16_scale, i18n._("Scale"), true );
+        var opaButton = addNativeCheckBox( propsGroup, '', w16_opacity, i18n._("Opacity"), true );
+        var masksButton = addNativeCheckBox( propsGroup, '', w16_mask, i18n._("Masks"), true );
+        var fxButton = addNativeCheckBox( propsGroup, '', w16_fx, i18n._("Effects"), true );
+        var allPropsButton = addNativeCheckBox( propsGroup, '', w16_props, i18n._("All properties") );
 
         allPropsButton.onClick = function() {
-            var checked = allPropsButton.checked;
-            posButton.setChecked(checked);
-            rotButton.setChecked(checked);
-            scaButton.setChecked(checked);
-            opaButton.setChecked(checked);
-            masksButton.setChecked(checked);
-            fxButton.setChecked(checked);
+            var checked = allPropsButton.value;
+            posButton.value = checked;
+            rotButton.value = checked;
+            scaButton.value = checked;
+            opaButton.value = checked;
+            masksButton.value = checked;
+            fxButton.value = checked;
         };
 
         selectButton.onClick = function() {
             var comp = DuAEProject.getActiveComp();
             if (!comp) return;
+            var range = selectMethodSelector.selection.index == 1;
             // Get range
             var inTime = comp.time;
             var outTime = comp.time;
-            if (currentTimeButton.checked) {
-                if (selectMethodSelector.index == 1) {
+            if (currentTimeButton.value) {
+                if (range) {
                     inTime = comp.workAreaStart;
                     outTime = comp.workAreaStart + comp.workAreaDuration;
                 }
             } else {
                 inTime = currentFormatToTime(inEdit.text, 1 / comp.frameDuration) - comp.displayStartTime;
-                if (selectMethodSelector.index == 1) outTime = currentFormatToTime(outEdit.text, 1 / comp.frameDuration) - comp.displayStartTime;
+                if (range) outTime = currentFormatToTime(outEdit.text, 1 / comp.frameDuration) - comp.displayStartTime;
                 else outTime = inTime;
             }
 
             // Get property types
             var props = [];
-            if (!allPropsButton.checked) {
-                if (posButton.checked) {
+            if (!allPropsButton.value) {
+                if (posButton.value) {
                     props.push('ADBE Position');
                     props.push('ADBE Vector Position');
                     props.push('ADBE Position_0');
                     props.push('ADBE Position_1');
                     props.push('ADBE Position_2');
                 }
-                if (rotButton.checked) {
+                if (rotButton.value) {
                     props.push('ADBE Rotate Z');
                     props.push('ADBE Rotate Y');
                     props.push('ADBE Rotate X');
                     props.push('ADBE Orientation');
                     props.push('ADBE Vector Rotation');
                 }
-                if (scaButton.checked) {
+                if (scaButton.value) {
                     props.push('ADBE Scale');
                     props.push('ADBE Vector Scale');
                 }
-                if (opaButton.checked) {
+                if (opaButton.value) {
                     props.push('ADBE Opacity');
                     props.push('ADBE Vector Group Opacity');
                 }
-                if (masksButton.checked) {
+                if (masksButton.value) {
                     props.push('ADBE Mask Parade');
                 }
-                if (fxButton.checked) {
+                if (fxButton.value) {
                     props.push('ADBE Effect Parade');
                 }
             }
 
             Duik.Animation.selectKeyframes(
                 comp,
-                layerSelectionSelector.index == 0,
-                layerTypeSelector.index == 0,
+                layerSelectionSelector.selection.index == 0,
+                layerTypeSelector.selection.index == 0,
                 [inTime, outTime],
                 props);
         };
@@ -288,40 +239,38 @@
     );
     pasteButton.optionsPopup.build = function() {
 
-        var offsetSelector = DuScriptUI.selector(pasteButton.optionsPanel);
-        offsetSelector.addButton(
-            i18n._("Offset values"),
-            w16_offset,
-            i18n._("Offset current values.")
-        );
-        offsetSelector.addButton(
-            i18n._("Absolute"),
-            w16_locator,
-            i18n._("Absolute values (replaces current values).")
-        );
-        offsetSelector.setCurrentIndex(1);
+        var offsetSelector = addNativeDropdown( pasteButton.optionsPanel, [
+            [
+                i18n._("Offset values"),
+                w16_offset,
+                i18n._("Offset current values.")
+            ],
+            [
+                i18n._("Absolute"),
+                w16_locator,
+                i18n._("Absolute values (replaces current values).")
+            ]
+        ], 1);
 
-        var reverseButton = DuScriptUI.checkBox(
+        var reverseButton = addNativeCheckBox(
             pasteButton.optionsPanel,
             i18n._("Reverse keyframes"),
             undefined,
             i18n._("Reverses the animation in time.")
         );
 
-        var replaceButton = DuScriptUI.checkBox(
+        var replaceButton = addNativeCheckBox(
             pasteButton.optionsPanel,
-            i18n._("Replace existing keyframes"),
-            undefined,
-            DuScriptUI.StringREPLACE_KEYFRAMES_TIP
+            i18n._("Replace existing keyframes")
         );
 
         pasteButton.onClick = function() {
             DuAE.beginUndoGroup(i18n._("Paste animation"));
             Duik.Animation.paste(
                 undefined,
-                replaceButton.checked,
-                offsetSelector.index == 0,
-                reverseButton.checked
+                replaceButton.value,
+                offsetSelector.selection.index == 0,
+                reverseButton.value
             );
             DuAE.endUndoGroup();
         };
@@ -353,14 +302,14 @@
     moveAnchorPointButton.onClick = function() {
 
         if (!moveAnchorPointGroup.built) {
-            buildMoveAnchorPointGroup(moveAnchorPointGroup, animationGroup);
+            buildNativeMoveAnchorPointGroup(moveAnchorPointGroup, animationGroup);
         }
 
         hideAllGroups();
         moveAnchorPointGroup.visible = true;
     };
 
-    createAlignButton(toolsGroup);
+    addNativeAlignButton(toolsGroup);
 
     var snapButton = toolsGroup.addButton(
         i18n._("Snap keys"),
@@ -377,38 +326,43 @@
     motionTrailButton.onClick = Duik.Automation.motionTrail;
     motionTrailButton.onAltClick = function() { Duik.Automation.motionTrail(true) };
 
-    var ikFkButton = toolsGroup.addButton({
-        text: i18n._("IK/FK Switch"),
-        helpTip: i18n._("Switches the selected controller between IK and FK.\nAutomatically adds the needed keyframes at current time."),
-        image: w16_ik_fk_switch,
-        options: true
-    });
+    var ikFkButton = toolsGroup.addButton(
+        i18n._("IK/FK Switch"),
+        w16_ik_fk_switch,
+        i18n._("Switches the selected controller between IK and FK.\nAutomatically adds the needed keyframes at current time."),
+        true
+    );
     ikFkButton.optionsPopup.build = function() {
-        var snapIKButton = DuScriptUI.button( ikFkButton.optionsPanel, {
-            text: i18n._("Snap IK"),
-            helpTip: i18n._("Snaps the IK to the FK values"),
-            image: w16_snap_ik
-        });
+        var snapIKButton = addNativeButton(
+            ikFkButton.optionsPanel,
+            i18n._("Snap IK"),
+            w16_snap_ik,
+            i18n._("Snaps the IK to the FK values")
+        );
         snapIKButton.onClick = Duik.Animation.snapIK;
-        var snapFKButton = DuScriptUI.button( ikFkButton.optionsPanel, {
-            text: i18n._("Snap FK"),
-            helpTip: i18n._("Snaps the FK to the IK values"),
-            image: w16_snap_fk
-        });
+        var snapFKButton = addNativeButton(
+            ikFkButton.optionsPanel,
+            i18n._("Snap FK"),
+            w16_snap_fk,
+            i18n._("Snaps the FK to the IK values")
+        );
         snapFKButton.onClick = Duik.Animation.snapFK;
         ikFkButton.onClick = Duik.Animation.switchIKFK;
     }
-    
 
-    var mainGroup = DuScriptUI.group(tab, 'stacked');
-    //mainGroup.margins = 3;
+    // Between the tool bar and the buttons.
+    addNativeSeparator(contentGroup, 'vertical');
+
+    var mainGroup = addNativeGroup(contentGroup, 'stack');
     mainGroup.alignment = ['fill', 'fill'];
 
-    var animationGroup = DuScriptUI.group(mainGroup, 'column');
+    var animationGroup = addNativeGroup(mainGroup, 'column');
 
-    DuScriptUI.separator( animationGroup, i18n._("Tweening")  );
+    // Tweening
 
-    var tweenTools = DuScriptUI.toolBar(animationGroup, 4);
+    var tweeningSection = addNativeSection( animationGroup, i18n._("Tweening") );
+
+    var tweenTools = addNativeToolBar(tweeningSection, 4, undefined, undefined, true);
 
     var splitKeyButton = tweenTools.addButton(
         i18n._("Split"),
@@ -417,38 +371,37 @@
         true
     );
     splitKeyButton.optionsPopup.build = function() {
-        var splitKeyDurationEdit = DuScriptUI.editText(
+        var splitKeyDurationEdit = addNativeEditText(
             splitKeyButton.optionsPanel,
             '2',
-            i18n._("Duration") + ': ',
             i18n._p("video image", "Frames"), /// TRANSLATORS: as in video frames/images
-            '',
-            ' ' + i18n._("Set the duration between two split keys."),
-            false
+            i18n._("Set the duration between two split keys."),
+            i18n._("Duration") + ':'
         );
 
-        var splitKeyAlignmentSelector = DuScriptUI.selector(splitKeyButton.optionsPanel);
-        splitKeyAlignmentSelector.addButton(
-            i18n._("Center"),
-            w16_align_center,
-            i18n._("Align around the current time.")
-        );
-        splitKeyAlignmentSelector.addButton(
-            i18n._("After"),
-            w16_align_in,
-            i18n._("Add the new key after the current one.")
-        );
-        splitKeyAlignmentSelector.addButton(
-            i18n._("Before"),
-            w16_align_out,
-            i18n._("Add the new key before the current one.")
-        );
-        splitKeyAlignmentSelector.setCurrentIndex(0);
+        var splitKeyAlignmentSelector = addNativeDropdown( splitKeyButton.optionsPanel, [
+            [
+                i18n._("Center"),
+                w16_align_center,
+                i18n._("Align around the current time.")
+            ],
+            [
+                i18n._("After"),
+                w16_align_in,
+                i18n._("Add the new key after the current one.")
+            ],
+            [
+                i18n._("Before"),
+                w16_align_out,
+                i18n._("Add the new key before the current one.")
+            ]
+        ], 0);
 
         splitKeyButton.onClick = function() {
             var alignment = DuAE.TimeAlignment.CENTER;
-            if (splitKeyAlignmentSelector.index == 1) alignment = DuAE.TimeAlignment.IN_POINT;
-            else if (splitKeyAlignmentSelector.index == 2) alignment = DuAE.TimeAlignment.OUT_POINT;
+            var index = splitKeyAlignmentSelector.selection.index;
+            if (index == 1) alignment = DuAE.TimeAlignment.IN_POINT;
+            else if (index == 2) alignment = DuAE.TimeAlignment.OUT_POINT;
 
             var duration = parseInt(splitKeyDurationEdit.text);
 
@@ -463,23 +416,17 @@
         true
     );
     freezePoseButton.optionsPopup.build = function() {
-        var propsSelector = DuScriptUI.selector( freezePoseButton.optionsPanel );
-        propsSelector.addButton( i18n._("Animated properties"), w16_animated_prop );
-        propsSelector.addButton( i18n._("Selected properties"), w16_selected_props );
-        propsSelector.setCurrentIndex(0);
-        var layersSelector = DuScriptUI.selector( freezePoseButton.optionsPanel );
-        layersSelector.addButton( i18n._("Selected layers"), w16_selected_layers );
-        layersSelector.addButton( i18n._("All layers"), w16_layers );
-        layersSelector.setCurrentIndex(0);
+        var propsSelector = addPropsSelector( freezePoseButton.optionsPanel );
+        var layersSelector = addLayersSelector( freezePoseButton.optionsPanel );
 
         freezePoseButton.onClick = function() {
-            var animatedProps = propsSelector.index == 0;
-            var selectedLayers = layersSelector.index == 0;
+            var animatedProps = propsSelector.selection.index == 0;
+            var selectedLayers = layersSelector.selection.index == 0;
             Duik.Animation.freezePose(animatedProps, selectedLayers);
         };
         freezePoseButton.onAltClick = function() {
-            var animatedProps = propsSelector.index == 0;
-            var selectedLayers = layersSelector.index == 0;
+            var animatedProps = propsSelector.selection.index == 0;
+            var selectedLayers = layersSelector.selection.index == 0;
             Duik.Animation.freezePose(animatedProps, selectedLayers, true);
         };
     };
@@ -489,7 +436,7 @@
         w16_sync_keys,
         i18n._("Synchronize the selected keyframes; moves them to the current time.\nIf multiple keyframes are selected for the same property, they're offset to the current time, keeping the animation.\n\n[Alt]: Syncs using the last keyframe instead of the first.")
     );
-    syncKeysButton.onClick = Duik.Animation.syncKeys; 
+    syncKeysButton.onClick = Duik.Animation.syncKeys;
     syncKeysButton.onAltClick = function () { Duik.Animation.syncKeys(true); };
 
     var cleanKeysButton = tweenTools.addButton(
@@ -499,197 +446,104 @@
     );
     cleanKeysButton.onClick = Duik.Animation.cleanKeyframes;
 
-    var tweenGroup = DuScriptUI.group( animationGroup, 'row' );
+    var tweenGroup = addNativeGroup( tweeningSection, 'row' );
+    tweenGroup.alignment = ['fill', 'top'];
 
-    var tweenSettingsButton = DuScriptUI.button(
-        tweenGroup,
-        '',
-        DuScriptUI.Icon.OPTIONS,
-        i18n._("Tweening options")
-    );
-    tweenSettingsButton.alignment = ['left', 'fill'];
-    var tweenOptionsPopup = DuScriptUI.popUp( i18n._("Tweening options") );
-    var tweenPropsSelector = DuScriptUI.selector( tweenOptionsPopup.content );
-    tweenPropsSelector.addButton( i18n._("Animated properties"), w16_animated_prop );
-    tweenPropsSelector.addButton( i18n._("Selected properties"), w16_selected_props );
-    tweenPropsSelector.setCurrentIndex(0);
-    var tweenLayersSelector = DuScriptUI.selector( tweenOptionsPopup.content );
-    tweenLayersSelector.addButton( i18n._("Selected layers"), w16_selected_layers );
-    tweenLayersSelector.addButton( i18n._("All layers"), w16_layers );
-    tweenLayersSelector.setCurrentIndex(0);
-    tweenOptionsPopup.tieTo(tweenSettingsButton);
+    var tweenSettingsButton = addOptionsButton( tweenGroup, i18n._("Tweening options"), i18n._("Tweening options") );
+    var tweenPropsSelector = addPropsSelector( tweenSettingsButton.popup.content );
+    var tweenLayersSelector = addLayersSelector( tweenSettingsButton.popup.content );
 
-    var tweenSlider = DuScriptUI.slider(tweenGroup,50,0,100,'column',false,'','%','left',[0,25,33,50,66,75,100]);
+    var tweenSlider = addNativeSlider(tweenGroup, 50, 0, 100, '', '%', {
+        textAlignment: 'left',
+        valueButtons: [0,25,33,50,66,75,100]
+    });
     tweenSlider.onChange = function() {
-        var animatedProps = tweenPropsSelector.index == 0;
-        var selectedLayers = tweenLayersSelector.index == 0;
+        var animatedProps = tweenPropsSelector.selection.index == 0;
+        var selectedLayers = tweenLayersSelector.selection.index == 0;
         Duik.Animation.tween( tweenSlider.value / 100, animatedProps, selectedLayers);
     };
 
-    DuScriptUI.separator( animationGroup, i18n._("Temporal interpolation") );
+    // Temporal interpolation
 
-    var keyEditGroup = DuScriptUI.group( animationGroup, 'row' );
-    var ksettingsButton = DuScriptUI.button(
-        keyEditGroup,
-        '',
-        DuScriptUI.Icon.OPTIONS,
-        i18n._("Set key options")
-    );
-    ksettingsButton.alignment = ['left', 'fill'];
-    var krovingButton = DuScriptUI.button( 
-        keyEditGroup,
-        '',
-        w12_kroving,
-        i18n._("Roving")
-    );
-    krovingButton.onClick = function() {
-        if (keyEditModeSelector.index == 0) {
-            var animatedProps = keyEditPropsSelector.index == 0;
-            var selectedLayers = keyEditLayersSelector.index == 0;
-            Duik.Animation.addRovingKey(animatedProps, selectedLayers);
-        }
-        else 
-        {
-            Duik.Animation.setRoving();
-        }
-    };
-    var klinButton = DuScriptUI.button( 
-        keyEditGroup,
-        '',
-        w12_klin,
-        i18n._("Linear")
-    );
-    klinButton.onClick = function() {
-        if (keyEditModeSelector.index == 0) {
-            var animatedProps = keyEditPropsSelector.index == 0;
-            var selectedLayers = keyEditLayersSelector.index == 0;
-            Duik.Animation.addLinearKey(animatedProps, selectedLayers);
-        }
-        else 
-        {
-            Duik.Animation.setLinear();
-        }
-    };
-    var kinbezButton = DuScriptUI.button( 
-        keyEditGroup,
-        '',
-        w12_kinbez,
-        i18n._("Ease In")
-    );
-    kinbezButton.onClick = function() {
-        if (keyEditModeSelector.index == 0) {
-            var animatedProps = keyEditPropsSelector.index == 0;
-            var selectedLayers = keyEditLayersSelector.index == 0;
-            Duik.Animation.addEaseInKey(animatedProps, selectedLayers, easeInSlider.value);
-        }
-        else 
-        {
-            Duik.Animation.setEaseIn(easeInSlider.value);
-        }
-    };
-    var koutbezButton = DuScriptUI.button( 
-        keyEditGroup,
-        '',
-        w12_koutbez,
-        i18n._("Ease Out")
-    );
-    koutbezButton.onClick = function() {
-        if (keyEditModeSelector.index == 0) {
-            var animatedProps = keyEditPropsSelector.index == 0;
-            var selectedLayers = keyEditLayersSelector.index == 0;
-            Duik.Animation.addEaseOutKey(animatedProps, selectedLayers, easeOutSlider.value);
-        }
-        else 
-        {
-            Duik.Animation.setEaseOut(easeOutSlider.value);
-        }
-    };
-    var kbezButton = DuScriptUI.button( 
-        keyEditGroup,
-        '',
-        w12_kbez,
-        i18n._("Easy Ease")
-    );
-    kbezButton.onClick = function() {
-        if (keyEditModeSelector.index == 0) {
-            var animatedProps = keyEditPropsSelector.index == 0;
-            var selectedLayers = keyEditLayersSelector.index == 0;
-            Duik.Animation.addEasyEaseKey(animatedProps, selectedLayers, easeInSlider.value, easeOutSlider.value);
-        }
-        else 
-        {
-            Duik.Animation.setEasyEase(easeInSlider.value, easeOutSlider.value);
-        }
-    };
-    var kautoButton = DuScriptUI.button( 
-        keyEditGroup,
-        '',
-        w12_kauto,
-        i18n._("Continuous")
-    );
-    kautoButton.onClick = function() {
-        if (keyEditModeSelector.index == 0) {
-            var animatedProps = keyEditPropsSelector.index == 0;
-            var selectedLayers = keyEditLayersSelector.index == 0;
-            Duik.Animation.addContinuousKey(animatedProps, selectedLayers);
-        }
-        else 
-        {
-            Duik.Animation.setContinuous();
-        }
-    };
-    var kholdButton = DuScriptUI.button( 
-        keyEditGroup,
-        '',
-        w12_khold,
-        i18n._("Hold")
-    );
-    kholdButton.onClick = function() {
-        if (keyEditModeSelector.index == 0) {
-            var animatedProps = keyEditPropsSelector.index == 0;
-            var selectedLayers = keyEditLayersSelector.index == 0;
-            Duik.Animation.addHoldKey(animatedProps, selectedLayers);
-        }
-        else 
-        {
-            Duik.Animation.setHold();
-        }
-    };
+    var temporalSection = addNativeSection( animationGroup, i18n._("Temporal interpolation") );
 
-    var keyEditOptionsPopup = DuScriptUI.popUp( i18n._("Keyframe options") );
-    var keyEditModeSelector = DuScriptUI.selector( keyEditOptionsPopup.content );
-    keyEditModeSelector.addButton( i18n._("Add keyframes"), w12_add );
-    keyEditModeSelector.addButton( i18n._("Edit selected keyframes"), w12_edit );
-    keyEditModeSelector.setCurrentIndex(1);
+    var keyEditGroup = addNativeGroup( temporalSection, 'row' );
+    keyEditGroup.alignment = ['fill', 'top'];
+
+    var ksettingsButton = addOptionsButton( keyEditGroup, i18n._("Set key options"), i18n._("Keyframe options") );
+    var keyEditOptions = ksettingsButton.popup.content;
+
+    var keyEditModeSelector = addNativeDropdown( keyEditOptions, [
+        [i18n._("Add keyframes"), w12_add],
+        [i18n._("Edit selected keyframes"), w12_edit]
+    ], 1);
     keyEditModeSelector.onChange = function() {
-        var i = keyEditModeSelector.index == 0;
+        if (!keyEditModeSelector.selection) return;
+        var i = keyEditModeSelector.selection.index == 0;
         keyEditPropsSelector.enabled = i;
         keyEditLayersSelector.enabled = i;
     }
-    var keyEditPropsSelector = DuScriptUI.selector( keyEditOptionsPopup.content );
-    keyEditPropsSelector.addButton( i18n._("Animated properties"), w16_animated_prop );
-    keyEditPropsSelector.addButton( i18n._("Selected properties"), w16_selected_props );
+    var keyEditPropsSelector = addPropsSelector( keyEditOptions );
     keyEditPropsSelector.enabled = false;
-    keyEditPropsSelector.setCurrentIndex(0);
 
-    var keyEditLayersSelector = DuScriptUI.selector( keyEditOptionsPopup.content );
-    keyEditLayersSelector.addButton( i18n._("Selected layers"), w16_selected_layers );
-    keyEditLayersSelector.addButton( i18n._("All layers"), w16_layers );
+    var keyEditLayersSelector = addLayersSelector( keyEditOptions );
     keyEditLayersSelector.enabled = false;
-    keyEditLayersSelector.setCurrentIndex(0);
 
-    keyEditOptionsPopup.tieTo( ksettingsButton );
+    // Adds keyframes when the options say so, or edits the selected ones.
+    function addingKeys() {
+        return keyEditModeSelector.selection.index == 0;
+    }
 
-    var easePresetsGroup = DuScriptUI.group( animationGroup );
-    var easePresetSettingsButton = DuScriptUI.button(
-        easePresetsGroup,
-        '',
-        DuScriptUI.Icon.OPTIONS,
-        i18n._("Set key options")
-    );
-    easePresetSettingsButton.alignment = ['left', 'fill'];
-    var easeOptionsPopup = DuScriptUI.popUp( i18n._("Ease options") );
-    var easeResetListButton = DuScriptUI.button(
+    function animatedProps() {
+        return keyEditPropsSelector.selection.index == 0;
+    }
+
+    function selectedLayers() {
+        return keyEditLayersSelector.selection.index == 0;
+    }
+
+    var krovingButton = addIconButton( keyEditGroup, w12_kroving, i18n._("Roving") );
+    krovingButton.onClick = function() {
+        if (addingKeys()) Duik.Animation.addRovingKey(animatedProps(), selectedLayers());
+        else Duik.Animation.setRoving();
+    };
+    var klinButton = addIconButton( keyEditGroup, w12_klin, i18n._("Linear") );
+    klinButton.onClick = function() {
+        if (addingKeys()) Duik.Animation.addLinearKey(animatedProps(), selectedLayers());
+        else Duik.Animation.setLinear();
+    };
+    var kinbezButton = addIconButton( keyEditGroup, w12_kinbez, i18n._("Ease In") );
+    kinbezButton.onClick = function() {
+        if (addingKeys()) Duik.Animation.addEaseInKey(animatedProps(), selectedLayers(), easeInSlider.value);
+        else Duik.Animation.setEaseIn(easeInSlider.value);
+    };
+    var koutbezButton = addIconButton( keyEditGroup, w12_koutbez, i18n._("Ease Out") );
+    koutbezButton.onClick = function() {
+        if (addingKeys()) Duik.Animation.addEaseOutKey(animatedProps(), selectedLayers(), easeOutSlider.value);
+        else Duik.Animation.setEaseOut(easeOutSlider.value);
+    };
+    var kbezButton = addIconButton( keyEditGroup, w12_kbez, i18n._("Easy Ease") );
+    kbezButton.onClick = function() {
+        if (addingKeys()) Duik.Animation.addEasyEaseKey(animatedProps(), selectedLayers(), easeInSlider.value, easeOutSlider.value);
+        else Duik.Animation.setEasyEase(easeInSlider.value, easeOutSlider.value);
+    };
+    var kautoButton = addIconButton( keyEditGroup, w12_kauto, i18n._("Continuous") );
+    kautoButton.onClick = function() {
+        if (addingKeys()) Duik.Animation.addContinuousKey(animatedProps(), selectedLayers());
+        else Duik.Animation.setContinuous();
+    };
+    var kholdButton = addIconButton( keyEditGroup, w12_khold, i18n._("Hold") );
+    kholdButton.onClick = function() {
+        if (addingKeys()) Duik.Animation.addHoldKey(animatedProps(), selectedLayers());
+        else Duik.Animation.setHold();
+    };
+
+    var easePresetsGroup = addNativeGroup( temporalSection, 'row' );
+    easePresetsGroup.alignment = ['fill', 'top'];
+
+    var easePresetSettingsButton = addOptionsButton( easePresetsGroup, i18n._("Set key options"), i18n._("Ease options") );
+    var easeOptionsPopup = easePresetSettingsButton.popup;
+    var easeResetListButton = addNativeButton(
         easeOptionsPopup.content,
         i18n._("Reset preset list"),
         w16_reset,
@@ -705,13 +559,12 @@
         DuESF.scriptSettings.save();
         easeOptionsPopup.hide();
     };
-    easeOptionsPopup.tieTo(easePresetSettingsButton);
     var defaultEasePresets = [ i18n._("Ease presets"),
         "25/75 | 0/0", "33/33 | 0/0", "33/33 | 100/100", "33/66 | 0/0", "50/50 | 0/0", "50/50 | 100/100", "66/33 | 0/0", "75/25 | 0/0", "80/80 | 0/0"
     ];
     var presets = DuESF.scriptSettings.get("easePresets", defaultEasePresets);
     var easePresetList = easePresetsGroup.add('dropdownlist',undefined,presets);
-    easePresetList.alignment = ['fill', 'top'];
+    easePresetList.alignment = ['fill', 'center'];
     easePresetList.selection = 0;
     easePresetList.onChange = function() {
         if (!easePresetList.selection) return;
@@ -729,13 +582,8 @@
         velocityLinkButton.setChecked(vals[3] != vals[4]);
         easeApplyAllButton.onClick();
     }
-    var easePresetAddButton = DuScriptUI.button( 
-        easePresetsGroup,
-        '',
-        w12_add,
-        i18n._("Add new ease preset")
-    );
-    easePresetAddButton.alignment = ['right', 'fill'];
+    var easePresetAddButton = addIconButton( easePresetsGroup, w12_add, i18n._("Add new ease preset") );
+    easePresetAddButton.alignment = ['right', 'center'];
     easePresetAddButton.onClick = function() {
         var presets = [];
         for (var i = 1 ; i < easePresetList.items.length ; i++)
@@ -754,13 +602,8 @@
         DuESF.scriptSettings.save();
         easePresetList.selection = 0;
     };
-    var easePresetRemoveButton = DuScriptUI.button(
-        easePresetsGroup,
-        '',
-        w12_remove,
-        i18n._("Remove selected ease preset")
-    );
-    easePresetRemoveButton.alignment = ['right', 'fill'];
+    var easePresetRemoveButton = addIconButton( easePresetsGroup, w12_remove, i18n._("Remove selected ease preset") );
+    easePresetRemoveButton.alignment = ['right', 'center'];
     easePresetRemoveButton.onClick = function() {
         if (!easePresetList.selection) return;
         if (easePresetList.selection.index == 0) return;
@@ -774,13 +617,8 @@
         DuESF.scriptSettings.save();
         easePresetList.selection = 0;
     };
-    var easePickButton = DuScriptUI.button(
-        easePresetsGroup,
-        '',
-        DuScriptUI.Icon.EYE_DROPPER,
-        i18n._("Pick ease and velocity from selected key.")
-    );
-    easePickButton.alignment = ['right', 'fill'];
+    var easePickButton = addIconButton( easePresetsGroup, DuScriptUI.Icon.EYE_DROPPER, i18n._("Pick ease and velocity from selected key.") );
+    easePickButton.alignment = ['right', 'center'];
     easePickButton.onClick = function() {
         var props = DuAEComp.getSelectedProps();
         var propList = new DuList(props);
@@ -805,13 +643,8 @@
 			break;
         }
     };
-    var easeApplyAllButton = DuScriptUI.button(
-        easePresetsGroup,
-        '',
-        DuScriptUI.Icon.CHECK,
-        i18n._("Apply ease and velocity to selected keyframes.")
-    );
-    easeApplyAllButton.alignment = ['right', 'fill'];
+    var easeApplyAllButton = addIconButton( easePresetsGroup, DuScriptUI.Icon.CHECK, i18n._("Apply ease and velocity to selected keyframes.") );
+    easeApplyAllButton.alignment = ['right', 'center'];
     easeApplyAllButton.onClick = function() {
         DuAE.beginUndoGroup( i18n._("Set ease"));
         easeApplyButton.onClick();
@@ -819,8 +652,29 @@
         DuAE.endUndoGroup();
     };
 
-    var easeGroup = DuScriptUI.group(animationGroup, 'row');
-    var easeInSlider = DuScriptUI.slider(easeGroup,33,1,100,'column',true,'','%','right',[75,50,33]);
+    // A row of two sliders, for the in and out values, with the buttons switching and linking them between them.
+    // The link button is checked when the values are unlinked.
+    function addInOutRow( container ) {
+        var row = addNativeGroup(container, 'row');
+        row.alignment = ['fill', 'top'];
+        row.alignChildren = ['fill', 'top'];
+        return row;
+    }
+
+    function addSwitchLinkButtons( row, switchTip ) {
+        var buttons = addNativeGroup( row, 'column' );
+        buttons.alignment = ['center', 'top'];
+        buttons.switchButton = addIconButton( buttons, w12_switch, switchTip );
+        buttons.linkButton = addNativeToggleButton( buttons, w12_constraints, w12_unlink_chain );
+        return buttons;
+    }
+
+    var easeGroup = addInOutRow(temporalSection);
+    var easeInSlider = addNativeSlider(easeGroup, 33, 1, 100, '', '%', {
+        inverted: true,
+        textAlignment: 'right',
+        valueButtons: [75,50,33]
+    });
     easeInSlider.onChange = function() {
         easeInSlider.lastModified = true;
 		easeOutSlider.lastModified = false;
@@ -836,28 +690,15 @@
     easeInSlider.onChanging = function() {
         if (!easeLinkButton.checked) easeOutSlider.setValue(easeInSlider.value);
     };
-    var easeButtonGroup = DuScriptUI.group( easeGroup, 'column' );
-    easeButtonGroup.alignment = ['center', 'fill'];
-    var easeSwitchButton = DuScriptUI.button(
-        easeButtonGroup,
-        '',
-        w12_switch,
-        i18n._("Switches in and out eases.")
-    );
+    var easeButtonGroup = addSwitchLinkButtons( easeGroup, i18n._("Switches in and out eases.") );
+    var easeSwitchButton = easeButtonGroup.switchButton;
     easeSwitchButton.onClick = function() {
         var inVal = easeInSlider.value;
 		easeInSlider.setValue(easeOutSlider.value);
 		easeOutSlider.setValue(inVal);
 		easeApplyButton.onClick();
     };
-    var easeLinkButton = DuScriptUI.checkBox(
-        easeButtonGroup,
-        '',
-        w12_constraints,
-        '',
-        '',
-        w12_unlink_chain
-    );
+    var easeLinkButton = easeButtonGroup.linkButton;
     easeLinkButton.onClick = function() {
         if (easeInSlider.lastModified)
 		{
@@ -868,7 +709,10 @@
 			easeInSlider.setValue(easeOutSlider.value);
 		}
     };
-    var easeOutSlider = DuScriptUI.slider(easeGroup,33,1,100,'column',false,'','%','left',[33,50,75]);
+    var easeOutSlider = addNativeSlider(easeGroup, 33, 1, 100, '', '%', {
+        textAlignment: 'left',
+        valueButtons: [33,50,75]
+    });
     easeOutSlider.onChange = function() {
         easeInSlider.lastModified = false;
 		easeOutSlider.lastModified = true;
@@ -884,19 +728,18 @@
     easeOutSlider.onChanging = function() {
         if (!easeLinkButton.checked) easeInSlider.setValue(easeOutSlider.value);
     };
-    var easeApplyButton = DuScriptUI.button(
-        easeGroup,
-        '',
-        DuScriptUI.Icon.CHECK,
-        i18n._("Apply ease to selected keyframes.")
-    );
-    easeApplyButton.alignment = ['right', 'fill'];
+    var easeApplyButton = addIconButton( easeGroup, DuScriptUI.Icon.CHECK, i18n._("Apply ease to selected keyframes.") );
+    easeApplyButton.alignment = ['right', 'top'];
     easeApplyButton.onClick =  function() {
         Duik.Animation.setEase( easeInSlider.value, easeOutSlider.value );
     };
 
-    var velocityGroup = DuScriptUI.group(animationGroup,'row');
-    var velocityInSlider = DuScriptUI.slider(velocityGroup,0,-400,400,'column',true,'','%','right',[200,100,0]);
+    var velocityGroup = addInOutRow(temporalSection);
+    var velocityInSlider = addNativeSlider(velocityGroup, 0, -400, 400, '', '%', {
+        inverted: true,
+        textAlignment: 'right',
+        valueButtons: [200,100,0]
+    });
     velocityInSlider.onChange = function() {
         velocityInSlider.lastModified = true;
 		velocityOutSlider.lastModified = false;
@@ -912,28 +755,15 @@
     velocityInSlider.onChanging = function() {
         if (!velocityLinkButton.checked) velocityOutSlider.setValue(velocityInSlider.value);
     };
-    var velocityButtonGroup = DuScriptUI.group( velocityGroup, 'column' );
-    velocityButtonGroup.alignment = ['center', 'fill'];
-    var velocitySwitchButton = DuScriptUI.button(
-        velocityButtonGroup,
-        '',
-        w12_switch,
-        i18n._("Switches in and out velocities.")
-    );
+    var velocityButtonGroup = addSwitchLinkButtons( velocityGroup, i18n._("Switches in and out velocities.") );
+    var velocitySwitchButton = velocityButtonGroup.switchButton;
     velocitySwitchButton.onClick = function() {
         var inVal = velocityInSlider.value;
 		velocityInSlider.setValue(velocityOutSlider.value);
 		velocityOutSlider.setValue(inVal);
 		velocityApplyButton.onClick();
     }
-    var velocityLinkButton = DuScriptUI.checkBox(
-        velocityButtonGroup,
-        '',
-        w12_constraints,
-        '',
-        '',
-        w12_unlink_chain
-    );
+    var velocityLinkButton = velocityButtonGroup.linkButton;
     velocityLinkButton.onClick = function() {
         if (velocityInSlider.lastModified)
 		{
@@ -944,7 +774,10 @@
 			velocityInSlider.setValue(velocityOutSlider.value);
 		}
     };
-    var velocityOutSlider = DuScriptUI.slider(velocityGroup,0,-400,400,'column',false,'','%','left',[0, 100, 200]);
+    var velocityOutSlider = addNativeSlider(velocityGroup, 0, -400, 400, '', '%', {
+        textAlignment: 'left',
+        valueButtons: [0, 100, 200]
+    });
     velocityOutSlider.onChange = function() {
         velocityInSlider.lastModified = false;
 		velocityOutSlider.lastModified = true;
@@ -960,50 +793,44 @@
     velocityOutSlider.onChanging = function() {
         if (!velocityLinkButton.checked) velocityInSlider.setValue(velocityOutSlider.value);
     };
-    var velocityApplyButton = DuScriptUI.button(
-        velocityGroup,
-        '',
-        DuScriptUI.Icon.CHECK,
-        i18n._("Apply velocity to selected keyframes.")
-    );
-    velocityApplyButton.alignment = ['right', 'fill'];
+    var velocityApplyButton = addIconButton( velocityGroup, DuScriptUI.Icon.CHECK, i18n._("Apply velocity to selected keyframes.") );
+    velocityApplyButton.alignment = ['right', 'top'];
     velocityApplyButton.onClick = function() {
         Duik.Animation.setVelocity( velocityInSlider.value, velocityOutSlider.value );
     };
 
-    DuScriptUI.separator( animationGroup, i18n._("Spatial interpolation") );
+    // Spatial interpolation
 
-    var spatialInterpolationGroup = DuScriptUI.group( animationGroup, 'row' );
+    var spatialSection = addNativeSection( animationGroup, i18n._("Spatial interpolation") );
 
-    var spatialLinButton = DuScriptUI.button(
+    var spatialInterpolationGroup = addNativeGroup( spatialSection, 'row' );
+    spatialInterpolationGroup.alignment = ['fill', 'top'];
+
+    var spatialLinButton = addIconButton(
         spatialInterpolationGroup,
-        '',
         w16_linear,
         i18n._("Set the spatial interpolation to linear for selected keyframes.")
     );
     spatialLinButton.onClick = Duik.Animation.setSpatialLinear;
-    var spatialBezierInOutButton = DuScriptUI.button(
+    var spatialBezierInOutButton = addIconButton(
         spatialInterpolationGroup,
-        '',
         w16_bezier_in_out,
-        i18n._("Set the spatial interpolation to B\u00e9zier for selected keyframes.")
+        i18n._("Set the spatial interpolation to Bézier for selected keyframes.")
     );
     spatialBezierInOutButton.onClick = Duik.Animation.setSpatialBezier;
-    var spatialBezierOutButton = DuScriptUI.button(
+    var spatialBezierOutButton = addIconButton(
         spatialInterpolationGroup,
-        '',
         w16_bezier_out,
-        i18n._("Set the spatial interpolation to B\u00e9zier Out for selected keyframes.")
+        i18n._("Set the spatial interpolation to Bézier Out for selected keyframes.")
     );
     spatialBezierOutButton.onClick = Duik.Animation.setSpatialBezierOut;
-    var spatialBezierInButton = DuScriptUI.button(
+    var spatialBezierInButton = addIconButton(
         spatialInterpolationGroup,
-        '',
         w16_bezier_in,
-        i18n._("Set the spatial interpolation to B\u00e9zier In for selected keyframes.")
+        i18n._("Set the spatial interpolation to Bézier In for selected keyframes.")
     );
     spatialBezierInButton.onClick = Duik.Animation.setSpatialBezierIn;
-    var spatialAutoButton = DuScriptUI.button(
+    var spatialAutoButton = addNativeButton(
         spatialInterpolationGroup,
         i18n._("Fix"),
         w16_autorig,
@@ -1011,11 +838,11 @@
     );
     spatialAutoButton.onClick = Duik.Animation.fixSpatialInterpolation;
 
-    DuScriptUI.separator( animationGroup );
+    // A grid with a row per button, like the Links and constraints panel: its options and image, then the button.
+    var line1 = addNativeButtonGrid(animationGroup);
+    line1.buttonHeight = 24;
 
-    var line1 = DuScriptUI.group(animationGroup, 'column');
-
-    var animationLibButton = DuScriptUI.button(
+    var animationLibButton = addNativeButton(
         line1,
         i18n._("Animation library") + '...',
         w16_library,
@@ -1027,7 +854,7 @@
         if (!libFolder.exists) libFolder.create();
 
         if (!animationLibGroup.built) {
-            createSubPanel(
+            addNativeSubPanel(
                 animationLibGroup,
                 i18n._("Animation library"),
                 animationGroup,
@@ -1037,186 +864,129 @@
             #include "animationLibPanel.jsx"
             buildAnimationLibPanel( animationLibGroup );
 
-            DuScriptUI.showUI(animationLibGroup);
+            nativeLayout(animationLibGroup);
         }
 
         hideAllGroups();
         animationLibGroup.visible = true;
     }
 
-    createKleanerButton( line1 );
+    addNativeKleanerButton( line1 );
 
-    var sequenceButton = DuScriptUI.button(
+    var sequenceButton = addNativeButton(
         line1,
         i18n._("Sequence"),
         w16_sequencer,
         i18n._("Sequence layers or keyframes.\n\n[Ctrl]: Sequence keyframes instead of layers\n[Alt]: Reverse"),
-        true, // option panel
-        undefined, // orientation
-        undefined, // alignment
-        undefined, // localize
-        undefined, // options without button
-        undefined, // options button text
-        true // options without panel
+        {
+            options: true,
+            optionsWithoutPanel: true
+        }
     );
     sequenceButton.onOptions = function(showUI) {
         showUI = def(showUI, true);
 
         if (!sequenceGroup.built){
-            createSubPanel(
+            addNativeSubPanel(
                 sequenceGroup,
                 i18n._("Sequence"),
                 animationGroup,
                 false
             );
 
-            var layerKeySelector = DuScriptUI.selector( sequenceGroup );
-            layerKeySelector.addButton(
-                i18n._("Layers"),
-                w16_layers
-            );
-            layerKeySelector.addButton(
-                i18n._("Keyframes"),
-                w16_keyframe
-            );
-            layerKeySelector.setCurrentIndex(0);
+            var layerKeySelector = addNativeDropdown( sequenceGroup, [
+                [i18n._("Layers"), w16_layers],
+                [i18n._("Keyframes"), w16_keyframe]
+            ], 0);
             layerKeySelector.onChange = function() {
-                layerModeSelector.visible = layerKeySelector.index == 0;
+                if (!layerKeySelector.selection) return;
+                layerModeSelector.visible = layerKeySelector.selection.index == 0;
             };
 
-            var layerModeSelector = DuScriptUI.selector( sequenceGroup );
+            var layerModeSelector = addNativeDropdown( sequenceGroup, [
+                [i18n._("Times"), w16_sequencer_times],
+                [i18n._("In points"), w16_sequencer],
+                [i18n._("Out points"), w16_sequencer_out]
+            ], 0);
 
-            layerModeSelector.addButton(
-                i18n._("Times"),
-                w16_sequencer_times
-            );
-            layerModeSelector.addButton(
-                i18n._("In points"),
-                w16_sequencer
-            );
-            layerModeSelector.addButton(
-                i18n._("Out points"),
-                w16_sequencer_out
-            );
-            layerModeSelector.setCurrentIndex(0);
+            var shapeSelector = addNativeDropdown( sequenceGroup, [
+                [i18n._("Linear"), w16_linear_interpolation],
+                [i18n._("Ease - Sigmoid (logistic)"), w16_interpolator],
+                [i18n._("Natural - Bell (gaussian)"), w16_gaussian_interpolation],
+                [i18n._("Ease In (logarithmic)"), w16_logarithmic_interpolation],
+                [i18n._("Ease Out (exponential)"), w16_exponential_interpolation]
+            ], 2);
 
-            var shapeSelector = DuScriptUI.selector( sequenceGroup );
-            shapeSelector.addButton(
-                i18n._("Linear"),
-                w16_linear_interpolation
-            );
-            shapeSelector.addButton(
-                i18n._("Ease - Sigmoid (logistic)"),
-                w16_interpolator
-            );
-            shapeSelector.addButton(
-                i18n._("Natural - Bell (gaussian)"),
-                w16_gaussian_interpolation
-            );
-            shapeSelector.addButton(
-                i18n._("Ease In (logarithmic)"),
-                w16_logarithmic_interpolation
-            );
-            shapeSelector.addButton(
-                i18n._("Ease Out (exponential)"),
-                w16_exponential_interpolation
-            );
-            shapeSelector.setCurrentIndex(2);
-
-            var durationEdit = DuScriptUI.editText(
+            var durationEdit = addNativeEditText(
                 sequenceGroup,
                 '24',
-                i18n._n("Duration:") + ' ',
-                ' ' + i18n._p("video image", "Frames"), /// TRANSLATORS: as in video frames/images
+                i18n._p("video image", "Frames"), /// TRANSLATORS: as in video frames/images
                 '',
-                '',
-                false
+                i18n._("Duration") + ':'
             );
 
-            var rateSlider = DuScriptUI.slider(
+            var rateSlider = addNativeSlider(
                 sequenceGroup,
                 30,
                 0,
                 100,
-                'row',
-                false,
-                i18n._p("interpolation", "Rate") /// TRANSLATORS: a rate used in an interpolation, how fast/slow is the interpolation
+                i18n._p("interpolation", "Rate"), /// TRANSLATORS: a rate used in an interpolation, how fast/slow is the interpolation
+                '',
+                { orientation: 'row' }
             );
 
-            DuScriptUI.separator(sequenceGroup);
-
-            var okButton = DuScriptUI.button(
+            var okButton = addNativeValidButton(
                 sequenceGroup,
                 i18n._("Sequence"),
-                DuScriptUI.Icon.CHECK,
-                i18n._("Sequence layers or keyframes.\n\n[Ctrl]: Sequence keyframes instead of layers\n[Alt]: Reverse"),
-                false,
-                'row',
-                'center'
+                i18n._("Sequence layers or keyframes.\n\n[Ctrl]: Sequence keyframes instead of layers\n[Alt]: Reverse")
             );
-            okButton.onClick = function() {
-                var moveLayers = layerModeSelector.index == 0;
-                var inPoints = layerModeSelector.index == 1;
 
+            // The options of the sequence, read when it's run.
+            function getDuration() {
                 var duration = parseInt(durationEdit.text);
                 if (isNaN(duration)) duration = 24;
+                return duration;
+            }
 
-                if (layerKeySelector.index == 0) Duik.Animation.sequenceLayers(duration, moveLayers, inPoints, false, getInterpolation());
-                else Duik.Animation.sequenceKeys(duration, false, getInterpolation());
+            function moveLayers() {
+                return layerModeSelector.selection.index == 0;
+            }
+
+            function inPoints() {
+                return layerModeSelector.selection.index == 1;
+            }
+
+            function sequenceKeys() {
+                return layerKeySelector.selection.index == 1;
+            }
+
+            okButton.onClick = function() {
+                if (!sequenceKeys()) Duik.Animation.sequenceLayers(getDuration(), moveLayers(), inPoints(), false, getInterpolation());
+                else Duik.Animation.sequenceKeys(getDuration(), false, getInterpolation());
             };
             sequenceButton.onClick = function() {
-                var moveLayers = layerModeSelector.index == 0;
-                var inPoints = layerModeSelector.index == 1;
-
-                var duration = parseInt(durationEdit.text);
-                if (isNaN(duration)) duration = 24;
-
-                Duik.Animation.sequenceLayers(duration, moveLayers, inPoints, false, getInterpolation());
+                Duik.Animation.sequenceLayers(getDuration(), moveLayers(), inPoints(), false, getInterpolation());
             };
             okButton.onAltClick = function() {
-                var moveLayers = layerModeSelector.index == 0;
-                var inPoints = layerModeSelector.index == 1;
-
-                var duration = parseInt(durationEdit.text);
-                if (isNaN(duration)) duration = 24;
-
-                if (layerKeySelector.index == 0) Duik.Animation.sequenceLayers(duration, moveLayers, inPoints, true, getInterpolation());
-                else Duik.Animation.sequenceKeys(duration, true, getInterpolation());
+                if (!sequenceKeys()) Duik.Animation.sequenceLayers(getDuration(), moveLayers(), inPoints(), true, getInterpolation());
+                else Duik.Animation.sequenceKeys(getDuration(), true, getInterpolation());
             };
             sequenceButton.onAltClick = function() {
-                var moveLayers = layerModeSelector.index == 0;
-                var inPoints = layerModeSelector.index == 1;
-
-                var duration = parseInt(durationEdit.text);
-                if (isNaN(duration)) duration = 24;
-
-                Duik.Animation.sequenceLayers(duration, moveLayers, inPoints, true, getInterpolation());
+                Duik.Animation.sequenceLayers(getDuration(), moveLayers(), inPoints(), true, getInterpolation());
             };
 
             sequenceButton.onCtrlClick = okButton.onCtrlClick = function() {
-                var moveLayers = layerModeSelector.index == 0;
-                var inPoints = layerModeSelector.index == 1;
-
-                var duration = parseInt(durationEdit.text);
-                if (isNaN(duration)) duration = 24;
-
-                Duik.Animation.sequenceKeys(duration, false, getInterpolation());
+                Duik.Animation.sequenceKeys(getDuration(), false, getInterpolation());
             };
             sequenceButton.onCtrlAltClick = okButton.onCtrlAltClick = function() {
-                var moveLayers = layerModeSelector.index == 0;
-                var inPoints = layerModeSelector.index == 1;
-
-                var duration = parseInt(durationEdit.text);
-                if (isNaN(duration)) duration = 24;
-
-                Duik.Animation.sequenceKeys(duration, true, getInterpolation());
+                Duik.Animation.sequenceKeys(getDuration(), true, getInterpolation());
             };
 
             function getInterpolation() {
 
                 // For now, approximate with a Bezier function
                 var rate = rateSlider.value / 100;
-                var s = shapeSelector.index;
+                var s = shapeSelector.selection.index;
                 if (s == 0) return DuInterpolation.linear;
 
                 if (s == 1) { // S
@@ -1225,19 +995,16 @@
                     };
                 }
                 if (s == 2) { // B
-                    //var outRate = 
                     return function(t, tm, tM, vm, vM) {
                         return DuInterpolation.bezier(t, tm, tM, vm, vM, [0, rate, 1, rate]);
                     };
                 }
                 if (s == 3) { // Log
-                    //var outRate = 
                     return function(t, tm, tM, vm, vM) {
                         return DuInterpolation.bezier(t, tm, tM, vm, vM, [0, 0, 1, 1-rate]);
                     };
                 }
                 if (s == 4) { // exp
-                    //var outRate = 
                     return function(t, tm, tM, vm, vM) {
                         return DuInterpolation.bezier(t, tm, tM, vm, vM, [0, rate, 1, 1]);
                     };
@@ -1254,7 +1021,7 @@
                 return DuInterpolation.gaussian;*/
             }
 
-            DuScriptUI.showUI(sequenceGroup);
+            nativeLayout(sequenceGroup);
         }
         if (showUI) {
             hideAllGroups();
@@ -1262,21 +1029,21 @@
         }
     }
 
-    createXSheetButton( line1 );
+    addNativeXSheetButton( line1 );
 
-    var nlaButton = DuScriptUI.button( line1,
+    var nlaButton = addNativeButton(
+        line1,
+        i18n._("Non-linear animation"),
+        w16_nla,
+        i18n._("Edit animations together."),
         {
-            text: i18n._("Non-linear animation"),
-            image: w16_nla,
-            helpTip: i18n._("Edit animations together."),
-            addOptionsPanel: true,
             options: true,
             optionsWithoutButton: true
         }
     );
     nlaButton.onClick = Duik.Automation.setupNLA;
     nlaButton.optionsPopup.build = function() {
-        var clipButton = DuScriptUI.button(
+        var clipButton = addNativeButton(
             nlaButton.optionsPanel,
             i18n._("Add new clip"),
             w12_add,
@@ -1285,22 +1052,22 @@
         clipButton.onClick = Duik.Automation.addNLAClip;
     }
 
-    var celAnimationButton = DuScriptUI.button(
+    var celAnimationButton = addNativeButton(
         line1,
         i18n._("Cel animation..."), /// TRANSLATORS: i.e. traditional animation
         w16_cel_animation,
-        i18n._("Tools to help traditionnal animation using After Effects' paint effect with the brush tool."),
+        i18n._("Tools to help traditionnal animation using After Effects' paint effect with the brush tool.")
     );
     celAnimationButton.onClick = function() {
         if (!celAnimationGroup.built) {
-            createSubPanel(
+            addNativeSubPanel(
                 celAnimationGroup,
                 i18n._("Cel animation"), /// TRANSLATORS: i.e. traditional animation
                 animationGroup,
                 false
             );
 
-            var newCelButton = DuScriptUI.button(
+            var newCelButton = addNativeButton(
                 celAnimationGroup,
                 i18n._("New Cel."), /// TRANSLATORS: a (transparent) layer/celluloid in a traditional animation
                 w16_new_cel,
@@ -1309,109 +1076,75 @@
             newCelButton.onClick = Duik.Animation.newCel;
             newCelButton.onAltClick = function() { Duik.Animation.newCel(true) };
 
-            DuScriptUI.separator(celAnimationGroup);
+            addNativeSeparator(celAnimationGroup);
 
-            var onionSkinGroup = DuScriptUI.group( celAnimationGroup, 'row');
+            var onionSkinGroup = addNativeGroup( celAnimationGroup, 'row');
+            onionSkinGroup.alignment = ['fill', 'top'];
 
-            var onionSkinButton = DuScriptUI.checkBox(
+            var onionSkinButton = addNativeCheckBox(
                 onionSkinGroup,
                 i18n._("Onion skin"),
                 w16_onion_skin,
-                i18n._("Shows the previous and next frames with a reduced opacity.")
+                i18n._("Shows the previous and next frames with a reduced opacity."),
+                true
             );
-            onionSkinButton.alignment = ['left', 'fill'];
-            onionSkinButton.setChecked(true);
             onionSkinButton.onClick = function() {
-                if (onionSkinButton.checked) {
-                    onionInGroup.enabled = true;
-                    onionOutGroup.enabled = true;
-                    onionSkinEdit.enabled = true;
-                }
-                else {
-                    onionInGroup.enabled = false;
-                    onionOutGroup.enabled = false
-                    onionSkinEdit.enabled = false;
-                }
+                var enabled = onionSkinButton.value;
+                onionInGroup.enabled = enabled;
+                onionOutGroup.enabled = enabled;
+                onionSkinEdit.group.enabled = enabled;
 
                 var i = onionInSlider.value;
                 var o = onionOutSlider.value;
-                if (!onionInButton.checked) i = 0;
-                if (!onionOutButton.checked) o = 0;
+                if (!onionInButton.value) i = 0;
+                if (!onionOutButton.value) o = 0;
 
                 var f = parseInt( onionSkinEdit.text );
                 var e = parseInt( frameEditButton.text );
 
-                Duik.Animation.celOnionSkin( onionSkinButton.checked, f, e, i, o);
+                Duik.Animation.celOnionSkin( onionSkinButton.value, f, e, i, o);
             };
-            
-            var onionSkinEdit = DuScriptUI.editText(
+
+            var onionSkinEdit = addNativeEditText(
                 onionSkinGroup,
                 '5',
-                '',
-                ' ' + i18n._p("video image", "Frames"), /// TRANSLATORS: as in video frames/images
-                '',
-                '',
-                false
+                i18n._p("video image", "Frames") /// TRANSLATORS: as in video frames/images
             );
             onionSkinEdit.onChange = onionSkinButton.onClick;
 
-            var onionInGroup = DuScriptUI.group( celAnimationGroup, 'row');
+            var onionInGroup = addNativeGroup( celAnimationGroup, 'row');
+            onionInGroup.alignment = ['fill', 'top'];
 
-            var onionInButton = DuScriptUI.checkBox(
-                onionInGroup,
-                i18n._p("time", "In")
-            );
-            onionInButton.setChecked(true);
-            onionInButton.alignment = ['left', 'fill'];
+            var onionInButton = addNativeCheckBox( onionInGroup, i18n._p("time", "In"), null, '', true );
+            onionInButton.parent.alignment = ['left', 'center'];
             onionInButton.onClick = function() {
-                onionInSlider.enabled = onionInButton.checked;
+                onionInSlider.enabled = onionInButton.value;
                 onionSkinButton.onClick();
             };
 
-            var onionInSlider = DuScriptUI.slider(
-                onionInGroup,
-                50,
-                0,
-                100,
-                'row',
-                undefined,
-                '',
-                '%'
-            );
+            var onionInSlider = addNativeSlider( onionInGroup, 50, 0, 100, '', '%', { orientation: 'row' } );
             onionInSlider.onChange = onionSkinButton.onClick;
 
-            var onionOutGroup = DuScriptUI.group( celAnimationGroup, 'row');
+            var onionOutGroup = addNativeGroup( celAnimationGroup, 'row');
+            onionOutGroup.alignment = ['fill', 'top'];
 
-            var onionOutButton = DuScriptUI.checkBox(
-                onionOutGroup,
-                i18n._p("time", "Out")
-            );
-            onionOutButton.setChecked(true);
-            onionOutButton.alignment = ['left', 'fill'];
+            var onionOutButton = addNativeCheckBox( onionOutGroup, i18n._p("time", "Out"), null, '', true );
+            onionOutButton.parent.alignment = ['left', 'center'];
             onionOutButton.onClick = function() {
-                onionOutSlider.enabled = onionOutButton.checked;
+                onionOutSlider.enabled = onionOutButton.value;
                 onionSkinButton.onClick();
             };
 
-            var onionOutSlider = DuScriptUI.slider(
-                onionOutGroup,
-                50,
-                0,
-                100,
-                'row',
-                undefined,
-                '',
-                '%'
-            );
+            var onionOutSlider = addNativeSlider( onionOutGroup, 50, 0, 100, '', '%', { orientation: 'row' } );
             onionOutSlider.onChange = onionSkinButton.onClick;
 
-            DuScriptUI.separator(celAnimationGroup);
+            addNativeSeparator(celAnimationGroup);
 
-            var celFrameGroup = DuScriptUI.group( celAnimationGroup, 'row');
+            var celFrameGroup = addNativeGroup( celAnimationGroup, 'row');
+            celFrameGroup.alignment = ['fill', 'top'];
 
-            var prevFrameButton = DuScriptUI.button(
+            var prevFrameButton = addIconButton(
                 celFrameGroup,
-                '',
                 w16_previous_frame,
                 i18n._("Go to the previous frame")
             );
@@ -1420,47 +1153,45 @@
                 Duik.Animation.previousCel(e);
             };
 
-            var frameEditButton = DuScriptUI.editText(
+            var frameEditButton = addNativeEditText(
                 celFrameGroup,
                 '2',
-                i18n._p("animation", "Exposure:") + ' ', /// TRANSLATORS: animation exposure (the duration of each frame)
-                ' ' + i18n._p("video image", "Frames"),
-                '',
+                i18n._p("video image", "Frames"),
                 i18n._("Changes the exposure of the animation (the frames per second)."),
-                false
+                i18n._p("animation", "Exposure:") /// TRANSLATORS: animation exposure (the duration of each frame)
             );
 
-            var nextFrameButton = DuScriptUI.button(
+            var nextFrameButton = addIconButton(
                 celFrameGroup,
-                '',
                 w16_next_frame,
                 i18n._("Go to the next frame.")
             );
+            nextFrameButton.alignment = ['right', 'center'];
             nextFrameButton.onClick = function() {
                 var e = parseInt( frameEditButton.text );
                 Duik.Animation.nextCel(e);
             };
 
-            DuScriptUI.showUI(celAnimationGroup);
+            nativeLayout(celAnimationGroup);
         }
 
         hideAllGroups();
         celAnimationGroup.visible = true;
     };
 
-    var animationLibGroup = DuScriptUI.group(mainGroup, 'column');
+    var animationLibGroup = addNativeGroup(mainGroup, 'column');
     animationLibGroup.visible = false;
     animationLibGroup.built = false;
 
-    var moveAnchorPointGroup = DuScriptUI.group(mainGroup, 'column');
+    var moveAnchorPointGroup = addNativeGroup(mainGroup, 'column');
     moveAnchorPointGroup.visible = false;
     moveAnchorPointGroup.built = false;
 
-    var celAnimationGroup = DuScriptUI.group(mainGroup, 'column');
+    var celAnimationGroup = addNativeGroup(mainGroup, 'column');
     celAnimationGroup.visible = false;
     celAnimationGroup.built = false;
 
-    var sequenceGroup = DuScriptUI.group(mainGroup, 'column');
+    var sequenceGroup = addNativeGroup(mainGroup, 'column');
     sequenceGroup.visible = false;
     sequenceGroup.built = false;
     //*/

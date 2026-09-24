@@ -1,10 +1,11 @@
 /**
  * Adds a button showing a menu of buttons, the native version of Duik's multi-buttons.<br />
  * The menu is built the first time it's shown, by the <code>build</code> callback, which adds the buttons with
- * <code>this.addButton(text, image, helpTip, hasOptions, optionsWithoutButton)</code>.
+ * <code>this.addButton(text, image, helpTip, hasOptions, optionsWithoutButton, optionsButtonText)</code>.
+ * Call <code>ensureBuilt()</code> to build it right away, when its buttons are needed before it's shown.
  * Clicking a button of the menu hides the menu.
  * @param {Group|Panel|Window} container - Where to add the button.
- * @param {string} text - The text.
+ * @param {string} text - The text. Without one, the button only shows its image.
  * @param {DuBinary} [image] - The image.
  * @param {string} [helpTip] - The help tip.
  * @param {int} [height] - The height of the button in pixels, {@link nativeMenuButtonHeight} by default.
@@ -16,7 +17,7 @@ function addNativeMenuButton(container, text, image, helpTip, height) {
         var layoutHeight = nativeLayoutSize(container).height;
         height = layoutHeight > 0 ? layoutHeight : nativeMenuButtonHeight;
     }
-    var menuButton = addNativeButton(container, text + '...', image, helpTip, {
+    var menuButton = addNativeButton(container, text == '' ? '' : text + '...', image, helpTip, {
         height: height
     });
 
@@ -27,10 +28,11 @@ function addNativeMenuButton(container, text, image, helpTip, height) {
     var menu = null;
     var menuButtons = null;
 
-    menuButton.addButton = function(text, image, helpTip, hasOptions, optionsWithoutButton) {
+    menuButton.addButton = function(text, image, helpTip, hasOptions, optionsWithoutButton, optionsButtonText) {
         var button = addNativeButton(menuButtons, text, image, helpTip, {
             options: hasOptions,
-            optionsWithoutButton: optionsWithoutButton
+            optionsWithoutButton: optionsWithoutButton,
+            optionsButtonText: optionsButtonText
         });
         button.control.onClick = function() {
             menu.hide();
@@ -44,7 +46,7 @@ function addNativeMenuButton(container, text, image, helpTip, height) {
         return button;
     };
 
-    menuButton.control.onClick = function() {
+    menuButton.ensureBuilt = function() {
         if (!menu) {
             menu = new Window('palette', '', undefined, { borderless: true });
             menu.margins = 2;
@@ -70,6 +72,10 @@ function addNativeMenuButton(container, text, image, helpTip, height) {
             menuButton.built = true;
             menuButton.build();
         }
+    };
+
+    menuButton.control.onClick = function() {
+        menuButton.ensureBuilt();
 
         // Opens over the button, like Duik's menus: the cancel button is right under the cursor.
         nativeShowPopup(menu, [menuButton.screenX, menuButton.screenY]);

@@ -5,10 +5,11 @@
  * its <code>optionsPanel</code> is the group containing the options.
  * @param {string} title - The title of the popup, which is also the text of the button running the action.
  * @param {Boolean} actionButton - Whether to add a button running the action of the button.
+ * @param {string} [actionText] - The text of the button running the action. The title by default.
  * @return {Object} The popup. Set its <code>build</code> callback to add the options to <code>button.optionsPanel</code>.
  * <code>ensureBuilt()</code> builds it without showing it; <code>show(location)</code> and <code>hide()</code>.
  */
-function addNativeOptionsPopup(button, title, actionButton) {
+function addNativeOptionsPopup(button, title, actionButton, actionText) {
     var popup = {
         built: false,
         window: null,
@@ -31,7 +32,7 @@ function addNativeOptionsPopup(button, title, actionButton) {
 
         if (actionButton) {
             addNativeSeparator(win);
-            var runButton = win.add('button', undefined, title);
+            var runButton = win.add('button', undefined, def(actionText, title));
             runButton.onClick = button.click;
         }
 
